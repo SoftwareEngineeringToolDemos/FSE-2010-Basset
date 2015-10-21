@@ -16,3 +16,5 @@ In this repository, for Basset you will find:
 - :white_check_mark: The original tool (available) 
 
 This repository was constructed by [Gaurav Shah](https://github.com/gshah2) under the supervision of [Dr. Emerson Murphy-Hill](https://github.com/CaptainEmerson).
+
+We would also like to thank Dr. Steven Lauterburg	, Dr. Rajesh K. Karmani	, Dr. Darko Marinov	and Dr. Gul Agha for their help with setting up the tool . 
