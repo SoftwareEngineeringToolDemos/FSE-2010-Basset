@@ -5,7 +5,7 @@ actor programs.
 
 The tool was originally presented in this [Paper](http://dl.acm.org/citation.cfm?id=1882349) at Foundations of Software Engineering, 2010.
 
-This repository is not the original repository for this tool. Here are some links to the original project:
+This repository  _is not_ the original repository for this tool. Here are some links to the original project:
 
 + [The Official Project Page, including source code](http://mir.cs.illinois.edu/basset/)
 + [The Official Tool Download Page](http://mir.cs.illinois.edu/basset/)
