@@ -35,7 +35,7 @@ Vagrant.configure(2) do |config|
 
     cd Desktop
 
-    wget /home/haris/Desktop/jpf.tar.gz https://github.com/hmansari/FSE-2010-Basset/raw/master/build-vm/vm-contents/jpf.tar.gz
+    wget /home/vagrant/Desktop/jpf.tar.gz https://github.com/SoftwareEngineeringToolDemos/FSE-2010-Basset/raw/master/build-vm/vm-contents/jpf.tar.gz 
 
     tar -zxvf jpf.tar.gz
 
