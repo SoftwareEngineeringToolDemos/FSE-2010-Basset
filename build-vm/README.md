@@ -1,7 +1,7 @@
 ###Please follow these steps to spin up a virtual machine for Basset using vagrant script:
 1. Download and Install [Vagrant](https://www.vagrantup.com/downloads.html) on the host machine.
 2. Download and Install [Virtual Box](https://www.virtualbox.org/wiki/Downloads) on the host machine.
-2. Download the [Vagrantfile](https://github.com/SoftwareEngineeringToolDemos/FSE-2013-aPET/blob/master/build-vm/Vagrantfile) from [build-vm](https://github.com/SoftwareEngineeringToolDemos/FSE-2013-aPET/tree/master/build-vm) directory to your machine.
+2. Download the [Vagrantfile](https://github.com/SoftwareEngineeringToolDemos/FSE-2010-Basset/blob/master/build-vm/Vagrantfile) from [build-vm](https://github.com/SoftwareEngineeringToolDemos/FSE-2010-Basset/tree/master/build-vm) directory to your machine.
 3. In the host machine, cd into the directory that contains the Vagrantfile and run the command `"vagrant up"`.
 4. The command `"vagrant up"` will create a Ubuntu VM with Java and Eclipse installed in it.
 
