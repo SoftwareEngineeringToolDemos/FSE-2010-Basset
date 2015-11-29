@@ -1,5 +1,0 @@
-[Desktop Entry]
-Name=Verily
-Exec=gnome-terminal -e "bash -c '/home/vagrant/Desktop/jpf/jpf-actor/bin/jpf gov.nasa.jpf.actor.Basset pi.Driver 3;$SHELL'"
-Terminal=true
-Type=Application
