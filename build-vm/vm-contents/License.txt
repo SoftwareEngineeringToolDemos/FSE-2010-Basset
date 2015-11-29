@@ -1,0 +1,18 @@
+********************
+Licenses for this VM
+********************
+
+1. Oracle Virtual Box
+The VirtualBox Open Source Edition is licensed under the GPL V2. (Some parts of VirtualBox, especially libraries, may also be released under other licenses as well.)
+
+The full text of the license is available here:  http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+
+2. Eclipse
+Eclipse is released under the Eclipse Public License v1.0
+https://www.eclipse.org/org/documents/epl-v10.php
+
+3. aPET Plugin
+The authors have made the tool available on http://tools.hats-project.eu/update-site/. Currently the tool is under rebuild phase. 
+Please contact the author for seeking permission or license:
+Author: Miky Zamalloa
+Website: http://costa.ls.fi.upm.es/~mzamalloa/

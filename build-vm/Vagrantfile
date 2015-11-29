@@ -56,6 +56,28 @@ Vagrant.configure(2) do |config|
     cd /home/vagrant/Desktop
     
     chown -R vagrant: jpf
+
+
+    # Remove unused icons from sidebar (making VM as minimal as possible)
+    rm -f "/usr/share/applications/ubuntu-amazon-default.desktop"
+    rm -f "/usr/share/applications/libreoffice-calc.desktop"
+    rm -f "/usr/share/applications/libreoffice-writer.desktop"
+    rm -f "/usr/share/applications/libreoffice-impress.desktop"
+    rm -f "/usr/share/applications/ubuntu-software-center.desktop"
+    update-desktop-database
+
+    mkdir "/home/vagrant/.config/autostart"
+    mkdir "/home/vagrant/scripts"
+
+     # Disable screen lock
+  
+    wget -O "/home/vagrant/scripts/screenlock.sh" https://github.com/SoftwareEngineeringToolDemos/FSE-2013-aPET/raw/master/build-vm/vm-contents/screenlock.sh
+  
+    wget -O "/home/vagrant/.config/autostart/screenlock.desktop" https://github.com/SoftwareEngineeringToolDemos/FSE-2013-aPET/raw/master/build-vm/vm-contents/screenlock.desktop
+  
+    chmod -R a+rwx "/home/vagrant/scripts/"
+  
+    reboot
    
   SHELL
 

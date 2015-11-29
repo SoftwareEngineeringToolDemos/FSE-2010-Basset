@@ -1,0 +1,25 @@
+The aPET Eclipse plugin is completely integrated within the main ABS Tool suite, an Eclipse plugin which includes facilities for creating, managing and running ABS projects, features like debugging, visualization, analysis and testing, etc.
+
+Installation instructions:
+
+    1. Open Eclipse, go to Help -> Install new Software and use the following update site
+
+       http://costa.ls.fi.upm.es/~mzamalloa/aPetUpdateSite
+    
+    2. The installation is automatic and after reinstalling Eclipse aPET is ready to be used.
+
+       Note: The version in the ABS Tool Suite web site is not updated very often.
+       Note: It can be required to install the latest Eclipse Classic (version 3.7.2).
+
+Usage instructions:
+
+    1. At this point it is assumed that the Eclipse plugin is installed and Eclipse has been restarted. To check this, observe that there must be a new menu option in Eclipse named aPET and a little dog icon in the menu bar.
+    2. Create a new ABS project and place there the source ABS files. Some examples of ABS programs can be found here.
+    3. Open an ABS file and Select the methods/functions for which to generate test-cases from the outline view (the panel on the right hand-side). In case of selecting methods make sure they are those from the class and not those of the interface. To select more than method hold the caps or control key.
+    4. Press the aPET button (the one with the little dog) or alternatively go to the aPET menu. A window with the preferences of aPET is shown. Set them and press "Ok".
+    5. The output is displayed in the Eclipse console window. It includes information about the different phases performed by aPET as well as the generated test-cases in textual form. The test-cases are also written to an XML file ("/tmp/pet/abs_testcases.xml"). Additionally aPET generates automatically ABSUnit test-cases. They are currently generated in file abs-testcases.abs within the current ABS project.
+    
+    Note: In order to make use of all the cababilities of the ABS Tool suite the ABS perpective must be activated.
+
+
+Reference:http://costa.ls.fi.upm.es/apet/
