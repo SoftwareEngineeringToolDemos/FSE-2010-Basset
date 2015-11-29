@@ -71,9 +71,9 @@ Vagrant.configure(2) do |config|
 
      # Disable screen lock
   
-    wget -O "/home/vagrant/scripts/screenlock.sh" https://github.com/SoftwareEngineeringToolDemos/FSE-2013-aPET/raw/master/build-vm/vm-contents/screenlock.sh
+    wget -O "/home/vagrant/scripts/screenlock.sh" https://github.com/SoftwareEngineeringToolDemos/FSE-2010-Basset/raw/master/build-vm/vm-contents/screenlock.sh
   
-    wget -O "/home/vagrant/.config/autostart/screenlock.desktop" https://github.com/SoftwareEngineeringToolDemos/FSE-2013-aPET/raw/master/build-vm/vm-contents/screenlock.desktop
+    wget -O "/home/vagrant/.config/autostart/screenlock.desktop" https://github.com/SoftwareEngineeringToolDemos/FSE-2010-Basset/raw/master/build-vm/vm-contents/screenlock.desktop
   
     chmod -R a+rwx "/home/vagrant/scripts/"
 

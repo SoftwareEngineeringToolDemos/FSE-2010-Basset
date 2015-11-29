@@ -7,12 +7,11 @@ The VirtualBox Open Source Edition is licensed under the GPL V2. (Some parts of 
 
 The full text of the license is available here:  http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
-2. Eclipse
-Eclipse is released under the Eclipse Public License v1.0
-https://www.eclipse.org/org/documents/epl-v10.php
+2. JPF
+"JPF" or Java Pathfinder is a highly customizable execution environment for verification of Java™ bytecode programs. The system was developed at the ​NASA Ames Research Center, open sourced in 2005, and is freely available from this server under the ​NOSA 1.3 license.
 
-3. aPET Plugin
-The authors have made the tool available on http://tools.hats-project.eu/update-site/. Currently the tool is under rebuild phase. 
-Please contact the author for seeking permission or license:
-Author: Miky Zamalloa
-Website: http://costa.ls.fi.upm.es/~mzamalloa/
+3. Basset
+The authors have made the tool available through http://mir.cs.illinois.edu/basset/.  
+Please contact the author for seeking permission or license or any further details:
+Author: Steve Lauterburg
+Website: http://faculty.salisbury.edu/~stlauterburg/
