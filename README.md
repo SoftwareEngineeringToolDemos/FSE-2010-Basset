@@ -12,9 +12,9 @@ This repository _is not_ the original repository for this tool. Here are some li
 
 In this repository, for Basset you will find:
 
-+ :white_check_mark: [Source code](https://github.com/SoftwareEngineeringToolDemos/FSE-2010-Basset/tree/master/jpf/RemoteSystemsTempFiles)
++ :white_check_mark: [Source code](https://github.com/SoftwareEngineeringToolDemos/FSE-2010-Basset/tree/master/jpf/jpf-actor)
 - :white_check_mark: [The original tool (available)](https://github.com/SoftwareEngineeringToolDemos/FSE-2010-Basset/tree/master/jpf) 
 
-This repository was constructed by [Vrushti Shah](https://github.com/vrushti1991) under the supervision of [Dr. Emerson Murphy-Hill](https://github.com/CaptainEmerson).
+This repository was constructed by [Vrushti Shah](https://github.com/vrushti1991) and [Manish Singh](https://github.com/manish211) under the supervision of [Dr. Emerson Murphy-Hill](https://github.com/CaptainEmerson).
 
  I would also like to thank  Dr.Steven Lauterburg and his colleagues for developing this tool.
