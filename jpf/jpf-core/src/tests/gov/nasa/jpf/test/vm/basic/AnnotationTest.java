@@ -1,32 +1,32 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.test.vm.basic;
 
 import gov.nasa.jpf.ListenerAdapter;
+import gov.nasa.jpf.jvm.AnnotationInfo;
+import gov.nasa.jpf.jvm.FieldInfo;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.MethodInfo;
 import gov.nasa.jpf.jvm.bytecode.GETFIELD;
-import gov.nasa.jpf.jvm.bytecode.JVMInvokeInstruction;
+import gov.nasa.jpf.jvm.bytecode.Instruction;
+import gov.nasa.jpf.jvm.bytecode.InvokeInstruction;
 import gov.nasa.jpf.util.test.TestJPF;
-import gov.nasa.jpf.vm.AnnotationInfo;
-import gov.nasa.jpf.vm.FieldInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.MethodInfo;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Inherited;
@@ -200,7 +200,7 @@ public class AnnotationTest extends TestJPF {
   @interface A6 {
     String value() default "whatever";
   }
-  
+
   @A6
   @Test
   public void testAnnotationClass() throws ClassNotFoundException, NoSuchMethodException {
@@ -274,28 +274,6 @@ public class AnnotationTest extends TestJPF {
     }
   }
 
-  @Retention(RetentionPolicy.RUNTIME)
-  @interface A11 {
-      Class<?>[] value();
-  }
-
-  @Test
-  @A11({ AnnotationTest.class, Class.class })
-  public void testClassArrayValueOk() throws ClassNotFoundException, SecurityException, NoSuchMethodException {
-    if (verifyNoPropertyViolation()) {
-      Class<?> clazz = Class.forName(AnnotationTest.class.getName());
-      Method method = clazz.getDeclaredMethod("testClassArrayValueOk");
-      Annotation[] annotations = method.getAnnotations();
-      assertEquals(2, annotations.length);
-      assertNotNull(annotations[1]);
-
-      assertTrue(annotations[1] instanceof A11);
-      A11 ann = (A11) annotations[1];
-      assertTrue(ann.value()[0] == AnnotationTest.class);
-      assertTrue(ann.value()[1] == Class.class);
-    }
-  }
-
   //-------------------------------------------------------------------
   static class MyClass {
     @A1("the answer")
@@ -303,11 +281,10 @@ public class AnnotationTest extends TestJPF {
   }
   
   public static class DataListener extends ListenerAdapter {
-
-    @Override
-    public void executeInstruction(VM vm, ThreadInfo ti, Instruction insnToExecute){
-      if (insnToExecute instanceof GETFIELD){
-        FieldInfo fi = ((GETFIELD)insnToExecute).getFieldInfo();
+    public void executeInstruction(JVM vm){
+      Instruction insn = vm.getLastInstruction();
+      if (insn instanceof GETFIELD){
+        FieldInfo fi = ((GETFIELD)insn).getFieldInfo();
         if (fi.getName().equals("data")){
           AnnotationInfo ai = fi.getAnnotation("gov.nasa.jpf.test.vm.basic.AnnotationTest$A1");
           System.out.println("annotation for " + fi.getFullName() + " = " + ai);
@@ -337,11 +314,10 @@ public class AnnotationTest extends TestJPF {
   
   //-------------------------------------------------------------------
   public static class ArgListener extends ListenerAdapter {
-
-    @Override
-    public void executeInstruction (VM vm, ThreadInfo ti, Instruction insnToExecute){
-      if (insnToExecute instanceof JVMInvokeInstruction){
-        MethodInfo mi = ((JVMInvokeInstruction)insnToExecute).getInvokedMethod();
+    public void executeInstruction (JVM vm){
+      Instruction insn = vm.getLastInstruction();
+      if (insn instanceof InvokeInstruction){
+        MethodInfo mi = ((InvokeInstruction)insn).getInvokedMethod();
         if (mi.getName().equals("foo")){
           System.out.println("-- called method: " + mi.getUniqueName());
           
@@ -419,18 +395,18 @@ public class AnnotationTest extends TestJPF {
   // test for RuntimeVisibleAnnotations attributes that in turn have
   // element_value entries
   @Retention(RetentionPolicy.RUNTIME)
-  @interface A12 { // this one has the string value
+  @interface A11 { // this one has the string value
     String value();
   }
 
   @Retention(RetentionPolicy.RUNTIME)
-  @A12("Whatever")
-  @interface A13 {
+  @A11("Whatever")
+  @interface A12 {
     // this one has a RuntimeVisibleAnnotation attribute for A11 with a
     // String entry value
   }
 
-  @A13 // causes loading of @C
+  @A12 // causes loading of @C
   @Test
   public void testRecursiveRuntimeVisibleAnnotationValue(){
     if (verifyNoPropertyViolation()){
@@ -438,119 +414,4 @@ public class AnnotationTest extends TestJPF {
     }
   }
   
-  
-  //---------------------------------------------------------------
-  // test of char annotations
-  @Retention(RetentionPolicy.RUNTIME)
-  public @interface A14 {
-    char value();
-  }
-  
-  @Test
-  @A14('x')
-  public void testCharAnnotation(){
-    if (verifyNoPropertyViolation()){
-      try {
-        Class<?> clazz = Class.forName(AnnotationTest.class.getName());
-        Method method = clazz.getDeclaredMethod("testCharAnnotation");
-        Annotation[] annotations = method.getAnnotations();
-        assertEquals(2, annotations.length);
-        assertNotNull(annotations[1]);
-
-        assertTrue(annotations[1] instanceof A14);
-        A14 ann = (A14) annotations[1];
-        assertTrue(ann.value() == 'x');
-        
-      } catch (Throwable t){
-        t.printStackTrace();
-        fail("unexpected exception: " + t);
-      }
-    }
-  }
-  
-  //---------------------------------------------------------------
-  // test of char annotations
-  @Retention(RetentionPolicy.RUNTIME)
-  public @interface A15 {
-    float value();
-  }
-  
-  @Test
-  @A15(12.34f)
-  public void testFloatAnnotation(){
-    if (verifyNoPropertyViolation()){
-      try {
-        Class<?> clazz = Class.forName(AnnotationTest.class.getName());
-        Method method = clazz.getDeclaredMethod("testFloatAnnotation");
-        Annotation[] annotations = method.getAnnotations();
-        assertEquals(2, annotations.length);
-        assertNotNull(annotations[1]);
-
-        assertTrue(annotations[1] instanceof A15);
-        A15 ann = (A15) annotations[1];
-        assertTrue(Math.abs(ann.value() - 12.34f) < 0.00001);
-        
-      } catch (Throwable t){
-        t.printStackTrace();
-        fail("unexpected exception: " + t);
-      }
-    }
-  }
-
-  // test of char annotations
-  @Retention(RetentionPolicy.RUNTIME)
-  public @interface A16 {
-    double value();
-  }
-  
-  @Test
-  @A16(Double.MAX_VALUE)
-  public void testDoubleAnnotation(){
-    if (verifyNoPropertyViolation()){
-      try {
-        Class<?> clazz = Class.forName(AnnotationTest.class.getName());
-        Method method = clazz.getDeclaredMethod("testDoubleAnnotation");
-        Annotation[] annotations = method.getAnnotations();
-        assertEquals(2, annotations.length);
-        assertNotNull(annotations[1]);
-
-        assertTrue(annotations[1] instanceof A16);
-        A16 ann = (A16) annotations[1];
-        assertTrue(ann.value() == Double.MAX_VALUE);
-        
-      } catch (Throwable t){
-        t.printStackTrace();
-        fail("unexpected exception: " + t);
-      }
-    }
-  }
-
-  // test of char annotations
-  @Retention(RetentionPolicy.RUNTIME)
-  public @interface A17 {
-    long value();
-  }
-  
-  @Test
-  @A17(Long.MAX_VALUE)
-  public void testLongAnnotation(){
-    if (verifyNoPropertyViolation()){
-      try {
-        Class<?> clazz = Class.forName(AnnotationTest.class.getName());
-        Method method = clazz.getDeclaredMethod("testLongAnnotation");
-        Annotation[] annotations = method.getAnnotations();
-        assertEquals(2, annotations.length);
-        assertNotNull(annotations[1]);
-
-        assertTrue(annotations[1] instanceof A17);
-        A17 ann = (A17) annotations[1];
-        assertTrue(ann.value() == Long.MAX_VALUE);
-        
-      } catch (Throwable t){
-        t.printStackTrace();
-        fail("unexpected exception: " + t);
-      }
-    }
-  }
-
 }

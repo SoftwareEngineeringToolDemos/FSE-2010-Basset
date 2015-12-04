@@ -20,7 +20,7 @@ package gov.nasa.jpf.test.actor.testmji;
 
 import java.util.LinkedList;
 import gov.nasa.jpf.JPF;
-import gov.nasa.jpf.vm.MJIEnv;
+import gov.nasa.jpf.jvm.MJIEnv;
 import static gov.nasa.jpf.test.actor.testmji.JPF_gov_nasa_jpf_test_actor_testmji_MJIUtil.linArray;
 import static org.junit.Assert.*;
 import org.junit.Test;

@@ -22,7 +22,7 @@ import java.util.List;
 
 import gov.nasa.jpf.actor.util.MJICopier;
 import gov.nasa.jpf.actor.util.MJILinearizer;
-import gov.nasa.jpf.vm.MJIEnv;
+import gov.nasa.jpf.jvm.MJIEnv;
 
 /**
  * 

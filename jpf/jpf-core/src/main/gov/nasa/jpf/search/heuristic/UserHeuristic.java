@@ -1,40 +1,62 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.search.heuristic;
 
 import gov.nasa.jpf.Config;
-import gov.nasa.jpf.vm.ClassLoaderInfo;
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.JPF_gov_nasa_jpf_vm_Verify;
-import gov.nasa.jpf.vm.VM;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.StaticArea;
 
 
 /**
- * heuristic state prioritizer that is controlled by the system under test, which can
- * use Verify.get/set/resetHeuristicSearchValue() to compute priorities
+ * heuristic state prioritizer that uses fields of the Main class under test
+ * to determine priorities (i.e. priorities can be set by the program under test)
+ *  
+ * <2do> pcm - does this still make sense in light of MJI ? If we keep it, this
+ * has to be moved to the Verify interface!
  */
 public class UserHeuristic extends SimplePriorityHeuristic {
-  public UserHeuristic (Config config, VM vm) {
+  static final int defaultValue = 1000;
+
+  public UserHeuristic (Config config, JVM vm) {
     super(config, vm);
   }
 
-  @Override
   protected int computeHeuristicValue () {
-    return JPF_gov_nasa_jpf_vm_Verify.heuristicSearchValue;
+    
+    // <2do> pcm - BAD, remove the VM nuts-and-bolts dependencies
+    StaticArea ss = vm.getStaticArea();
+    ElementInfo   p = ss.get("Main");
+    // <2dp> - this is not initialized !
+
+    // this code is ugly because of the Reference interface
+    if (p != null) {
+      ElementInfo b = p.getObjectField("buffer");
+
+      if (b != null) {
+        int current = b.getIntField("current");
+        int capacity = b.getIntField("capacity");
+
+        return (capacity - current);
+      }
+    }
+
+    return defaultValue;
   }
 }

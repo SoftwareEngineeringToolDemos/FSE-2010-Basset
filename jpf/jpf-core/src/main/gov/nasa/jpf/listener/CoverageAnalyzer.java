@@ -1,44 +1,44 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2007 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.listener;
 
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.JPF;
 import gov.nasa.jpf.ListenerAdapter;
+import gov.nasa.jpf.jvm.AnnotationInfo;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.ExceptionHandler;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.MethodInfo;
+import gov.nasa.jpf.jvm.NoClassInfoException;
+import gov.nasa.jpf.jvm.ThreadInfo;
 import gov.nasa.jpf.jvm.bytecode.GOTO;
 import gov.nasa.jpf.jvm.bytecode.IfInstruction;
-import gov.nasa.jpf.jvm.bytecode.JVMInvokeInstruction;
-import gov.nasa.jpf.jvm.bytecode.JVMReturnInstruction;
+import gov.nasa.jpf.jvm.bytecode.Instruction;
+import gov.nasa.jpf.jvm.bytecode.InvokeInstruction;
+import gov.nasa.jpf.jvm.bytecode.ReturnInstruction;
 import gov.nasa.jpf.report.ConsolePublisher;
+import gov.nasa.jpf.report.HTMLPublisher;
 import gov.nasa.jpf.report.Publisher;
 import gov.nasa.jpf.report.PublisherExtension;
 import gov.nasa.jpf.util.Misc;
 import gov.nasa.jpf.util.StringSetMatcher;
-import gov.nasa.jpf.vm.AnnotationInfo;
-import gov.nasa.jpf.vm.ChoiceGenerator;
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.ClassInfoException;
-import gov.nasa.jpf.vm.ClassLoaderInfo;
-import gov.nasa.jpf.vm.ExceptionHandler;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.MethodInfo;
-import gov.nasa.jpf.vm.ThreadInfo;
 
 import java.io.File;
 import java.io.IOException;
@@ -319,7 +319,7 @@ public class CoverageAnalyzer extends ListenerAdapter implements PublisherExtens
                   b.set(i);
                 }
               }
-            } else if (insn instanceof JVMReturnInstruction) { // everything else is handler
+            } else if (insn instanceof ReturnInstruction) { // everything else is handler
               for (i++; i < code.length; i++) {
                 b.set(i);
               }
@@ -375,7 +375,7 @@ public class CoverageAnalyzer extends ListenerAdapter implements PublisherExtens
           } else if (insn instanceof GOTO) {
             Instruction tgt = ((GOTO) insn).getTarget();
             bb.set(tgt.getInstructionIndex());
-          } else if (insn instanceof JVMInvokeInstruction) {
+          } else if (insn instanceof InvokeInstruction) {
             // hmm, this might be a bit too conservative, but who says we
             // don't jump out of a caller into a handler, or even that we
             // ever return from the call?
@@ -470,9 +470,9 @@ public class CoverageAnalyzer extends ListenerAdapter implements PublisherExtens
         return true;
 
       try {
-        ci = ClassLoaderInfo.getCurrentResolvedClassInfo(className);
-      } catch (ClassInfoException cie) {
-        log.warning("CoverageAnalyzer problem: " + cie);   // Just log the problem but don't fail.  We still want the report to be written.
+        ci = ClassInfo.getResolvedClassInfo(className);
+      } catch (NoClassInfoException e) {
+        log.warning("CoverageAnalyzer problem: " + e);   // Just log the problem but don't fail.  We still want the report to be written.
       }
       
       return ci != null;
@@ -594,6 +594,8 @@ public class CoverageAnalyzer extends ListenerAdapter implements PublisherExtens
     }
 
     jpf.addPublisherExtension(ConsolePublisher.class, this);
+
+    jpf.addPublisherExtension(HTMLPublisher.class, this);
   }
 
   void getCoverageCandidates() {
@@ -602,8 +604,7 @@ public class CoverageAnalyzer extends ListenerAdapter implements PublisherExtens
     // just store one entry per qualified class name (i.e. there won't be
     // multiple entries)
     // NOTE : this doesn't yet deal with ClassLoaders, but that's also true for BCEL
-    ClassLoaderInfo cl = ClassLoaderInfo.getCurrentClassLoader();
-    for (String s : cl.getClassPathElements()) {
+    for (String s : ClassInfo.getClassPathElements()) {
       log.fine("analyzing classpath element: " + s);
       File f = new File(s);
       if (f.exists()) {
@@ -689,7 +690,7 @@ public class CoverageAnalyzer extends ListenerAdapter implements PublisherExtens
     // middle ground, we could use BCEL
 
     for (ClassCoverage cc : classes.values()) {
-      ClassInfo ci = ClassLoaderInfo.getCurrentResolvedClassInfo(cc.className);
+      ClassInfo ci = ClassInfo.getResolvedClassInfo(cc.className);
       for (MethodInfo mi : ci.getDeclaredMethodInfos()) {
         AnnotationInfo ai = getRequirementsAnnotation(mi);
         if (ai != null) {
@@ -746,8 +747,8 @@ public class CoverageAnalyzer extends ListenerAdapter implements PublisherExtens
    */
 
   //-------- the listener interface
-  @Override
-  public void classLoaded(VM vm, ClassInfo ci) {
+  public void classLoaded(JVM vm) {
+    ClassInfo ci = vm.getLastClassInfo();
     String clsName = ci.getName();
 
     if (loadedOnly) {
@@ -764,7 +765,8 @@ public class CoverageAnalyzer extends ListenerAdapter implements PublisherExtens
   MethodInfo lastMi = null;
   MethodCoverage lastMc = null;
 
-  MethodCoverage getMethodCoverage(Instruction insn) {
+  MethodCoverage getMethodCoverage(JVM vm) {
+    Instruction insn = vm.getLastInstruction();
 
     if (!insn.isExtendedInstruction()) {
       MethodInfo mi = insn.getMethodInfo();
@@ -810,15 +812,15 @@ public class CoverageAnalyzer extends ListenerAdapter implements PublisherExtens
     return mi.getAnnotation("gov.nasa.jpf.Requirement");
   }
 
-  @Override
-  public void instructionExecuted(VM vm, ThreadInfo ti, Instruction nextInsn, Instruction executedInsn) {
-    MethodCoverage mc = getMethodCoverage(executedInsn);
+  public void instructionExecuted(JVM vm) {
+    Instruction insn = vm.getLastInstruction();
+    MethodCoverage mc = getMethodCoverage(vm);
 
     if (mc != null) {
-      mc.setExecuted(ti, executedInsn);
+      mc.setExecuted(vm.getLastThreadInfo(), insn);
 
       if (showRequirements) {
-        if (executedInsn.getPosition() == 0) { // first insn in method, check for Requirements
+        if (insn.getPosition() == 0) { // first insn in method, check for Requirements
           AnnotationInfo ai = getRequirementsAnnotation(mc.getMethodInfo());
           if (ai != null) {
             String[] ids = ai.getValueAsStringArray();
@@ -829,8 +831,7 @@ public class CoverageAnalyzer extends ListenerAdapter implements PublisherExtens
     }
   }
 
-  @Override
-  public void choiceGeneratorSet(VM vm, ChoiceGenerator<?> newCG) {
+  public void choiceGeneratorSet(JVM vm) {
     /*** should be an option
     Instruction insn = vm.getLastInstruction();
     MethodCoverage mc = getMethodCoverage(vm);
@@ -856,13 +857,403 @@ public class CoverageAnalyzer extends ListenerAdapter implements PublisherExtens
     abstract void printRequirementsCoverage();
   }
 
+  class PublishHtml extends Publish {
+    PublishHtml (HTMLPublisher p){
+      // <todo> this is BAD, Publishers should not have to know about specific extensions
+      pw = p.getOut("Coverage");
+    }
+
+    void publish() {
+      pw.println("      <style type=\"text/css\">");
+      pw.println("         table {border-collapse: collapse; white-space: nowrap; border: 1px solid #000000;}");
+      pw.println("         td    {border: 1px solid #000000;}");
+      pw.println("         th    {background-color: #0080FF;}");
+      pw.println("      </style>");
+      HTMLPublisher.writeTableTreeScript(pw, 0);
+      HTMLPublisher.writeProgressBarStyle(pw);
+
+      printClassCoverages();
+
+      if (showRequirements) {
+        printRequirementsCoverage();
+      }
+
+      pw.close(); // BAD
+    }
+
+    void printCoverage (Coverage cov){
+      int nTotal = cov.total();
+      int nCovered = cov.covered();
+
+      if (nTotal <= 0) {
+        pw.print("<td class=\"covered\">0</td>");
+        pw.print("<td class=\"slash\">/</td>");
+        pw.print("<td class=\"total\">0</td>");
+        pw.println("<td></td>");
+      } else {
+        pw.print("<td class=\"covered\">" + nCovered + "</td>");
+        pw.print("<td class=\"slash\">/</td>");
+        pw.print("<td class=\"total\">" + nTotal + "</td>");
+        pw.println("<td>" + HTMLPublisher.makeProgressBar(100 * nCovered / nTotal) + "</td>");
+      }
+    }
+
+    void printClassCoverages() {
+      Coverage clsCoverage = new Coverage(0, 0);
+      Coverage mthCoverage = new Coverage(0, 0);
+      Coverage bbCoverage = new Coverage(0, 0);
+      Coverage lineCoverage = new Coverage(0, 0);
+      Coverage insnCoverage = new Coverage(0, 0);
+      Coverage branchCoverage = new Coverage(0, 0);
+      String lastClass = "";
+      BitSet executable;
+      BitSet covered;
+
+      computeCoverages("", clsEntries, clsCoverage, mthCoverage, branchCoverage, bbCoverage, lineCoverage, insnCoverage);
+
+      pw.println("      <p><b>Coverage</b></p>");
+
+      pw.println("      <style type=\"text/css\">");
+      pw.println("         tr.treeNodeOpened { font-weight: bold; background-color: #A0D0FF; }");
+      pw.println("         tr.treeNodeClosed { font-weight: bold; background-color: #A0D0FF; }");
+      pw.println("         td                { border: 1px solid #808080; padding: 0px 5px; }");
+      pw.println("         th                { border: 1px solid #000000; padding: 5px 5px; }");
+      pw.println("         td.firstCol       { border-top-style: hidden; }");
+      pw.println("         td.covered        { text-align: right; }");
+      pw.println("         td.slash          { text-align: center; border-left: hidden; border-right: hidden; }");
+      pw.println("         td.total          { text-align: right; padding-right: 10px; }");
+      pw.println("      </style>");
+
+      HTMLPublisher.writeTableTreeBegin(pw);
+
+      // Write header rows
+      pw.println("         <thead>");
+      pw.println("            <tr>");
+      pw.println("               <th rowspan=\"2\" valign=\"bottom\">Package / Class / Method</th>");
+      pw.println("               <th colspan=\"24\">Coverage</th>");
+      pw.println("            </tr>");
+      pw.println("            <tr>");
+      pw.println("               <th colspan=\"4\">Instructions</th>");
+      pw.println("               <th colspan=\"4\">Lines</th>");
+      pw.println("               <th colspan=\"4\">Basic Block</th>");
+      pw.println("               <th colspan=\"4\">Branch</th>");
+      pw.println("               <th colspan=\"4\">Methods</th>");
+      pw.println("               <th colspan=\"4\">Classes</th>");
+      pw.println("            </tr>");
+      pw.println("         </thead>");
+      pw.println("         <tbody>");
+
+      // TODO - Make the Coverage portion of the table scrollable - Resize the Coverage portion of the table when the frame resizes.
+
+      // Write total row
+      HTMLPublisher.writeTableTreeNodeBegin(pw, "cc", "style=\"background-color: #60A0FF\"");
+
+      pw.println("            <td>All</td>");
+
+      pw.print("            ");
+      printCoverage(insnCoverage);
+
+      pw.print("            ");
+      printCoverage(lineCoverage);
+
+      pw.print("            ");
+      printCoverage(bbCoverage);
+
+      pw.print("            ");
+      printCoverage(branchCoverage);
+
+      pw.print("            ");
+      printCoverage(mthCoverage);
+
+      pw.print("            ");
+      printCoverage(clsCoverage);
+
+      HTMLPublisher.writeTableTreeNodeEnd(pw);
+
+      // Write Body
+      for (Map.Entry<String, ClassCoverage> e : clsEntries) {
+        ClassCoverage cc = e.getValue();
+        Coverage cov;
+
+        printPackageCoverages(lastClass, e.getKey());
+        lastClass = e.getKey();
+
+        HTMLPublisher.writeTableTreeNodeBegin(pw, "cc-" + lastClass.replace('.', '-'));
+        pw.print("            <td class=\"firstCol\">");
+        pw.print(lastClass.substring(lastClass.lastIndexOf('.') + 1));
+        pw.println("</td>");
+
+        pw.print("            ");
+
+        printCoverage(cc.getCoveredInsn());
+        printCoverage(cc.getCoveredLines());
+        printCoverage(cc.getCoveredBasicBlocks());
+        printCoverage(cc.getCoveredBranches());
+        printCoverage(cc.getCoveredMethods());
+
+        pw.println();
+        HTMLPublisher.writeTableTreeNodeEnd(pw);
+
+        if (showMethods) {
+
+          executable = new BitSet();
+          covered = new BitSet();
+          if (cc.getCoveredLines(executable, covered)) {
+            ((HTMLPublisher) publisher).setSourceCoverage(cc.ci.getSourceFileName(), executable, covered);
+          }
+
+          printMethodCoverages(cc);
+        }
+      }
+
+      pw.println("         </tbody>");
+      HTMLPublisher.writeTableTreeEnd(pw);
+
+      // Expand classes that have methods without 100% coverage.
+      pw.println("      <script type=\"text/javascript\">");
+      pw.println("         addEvent(window, \"load\", openClasses);");
+      pw.println();
+      pw.println("         function openClasses()");
+      pw.println("         {");
+
+      for (Map.Entry<String, ClassCoverage> e : clsEntries) {
+        ClassCoverage cc = e.getValue();
+
+        if (!cc.getCoveredInsn().isFullyCovered()) {
+          pw.print("            treeNodeShowPath(\"");
+          pw.print("cc-" + e.getKey().replace('.', '-'));
+          pw.println("\");");
+        }
+      }
+
+      pw.println("         }");
+      pw.println("      </script>");
+    }
+
+    private void printPackageCoverages(String lastClass, String currentClass) {
+      String pack;
+      int i, start, len;
+      char test;
+
+      start = -1;
+      len = Math.min(lastClass.length(), currentClass.length());
+      for (i = 0; i < len; i++) {
+        test = lastClass.charAt(i);
+
+        if (test != currentClass.charAt(i)) {
+          break;
+        }
+
+        if (test == '.') {
+          start = i;
+        }
+      }
+
+      for (i = start + 1; i < currentClass.length(); i++) {
+        if (currentClass.charAt(i) == '.') {
+          Coverage clsCoverage = new Coverage(0, 0);
+          Coverage mthCoverage = new Coverage(0, 0);
+          Coverage bbCoverage = new Coverage(0, 0);
+          Coverage insnCoverage = new Coverage(0, 0);
+          Coverage lineCoverage = new Coverage(0, 0);
+          Coverage branchCoverage = new Coverage(0, 0);
+
+          pack = currentClass.substring(0, i);
+          computeCoverages(pack + '.', clsEntries, clsCoverage, mthCoverage, branchCoverage, bbCoverage, lineCoverage, insnCoverage);
+
+          HTMLPublisher.writeTableTreeNodeBegin(pw, "cc-" + pack.replace('.', '-'), "style=\"background-color: #60A0FF\"");
+          pw.print("         <td class=\"firstCol\">");
+          pw.print(currentClass.substring(start + 1, i));
+          pw.println("</td>");
+
+          pw.print("         ");
+          printCoverage(insnCoverage);
+
+          pw.print("         ");
+          printCoverage(lineCoverage);
+
+          pw.print("         ");
+          printCoverage(bbCoverage);
+
+          pw.print("         ");
+          printCoverage(branchCoverage);
+
+          pw.print("         ");
+          printCoverage(mthCoverage);
+
+          pw.print("         ");
+          printCoverage(clsCoverage);
+
+          HTMLPublisher.writeTableTreeNodeEnd(pw);
+
+          start = i;
+        }
+      }
+    }
+
+    void printMethodCoverages(ClassCoverage cc) {
+      String classNameTree = "cc-" + cc.className.replace('.', '-') + '-';
+      int line, lineNumbers[];
+      boolean result = true;
+
+      if (cc.methods == null) {
+        return;
+      }
+
+      ArrayList<Map.Entry<MethodInfo, MethodCoverage>> mthEntries =
+              Misc.createSortedEntryList(cc.methods, new Comparator<Map.Entry<MethodInfo, MethodCoverage>>() {
+
+        public int compare(Map.Entry<MethodInfo, MethodCoverage> o1,
+                Map.Entry<MethodInfo, MethodCoverage> o2) {
+          int a = o2.getValue().getCoveredInsn().percent();
+          int b = o1.getValue().getCoveredInsn().percent();
+
+          if (a == b) {
+            return o2.getKey().getUniqueName().compareTo(o1.getKey().getUniqueName());
+          } else {
+            return a - b;
+          }
+        }
+      });
+      
+      for (Map.Entry<MethodInfo, MethodCoverage> e : mthEntries) {
+        MethodCoverage mc = e.getValue();
+        MethodInfo mi = mc.getMethodInfo();
+        Coverage insnCoverage = mc.getCoveredInsn();
+        Coverage lineCoverage = mc.getCoveredLines();
+        Coverage branchCoverage = mc.getCoveredBranches();
+
+        result = result && insnCoverage.isFullyCovered();
+
+        HTMLPublisher.writeTableTreeNodeBegin(pw, classNameTree + HTMLPublisher.escape(mi.getLongName()));
+        pw.print("            <td class=\"firstCol\">");
+         
+        lineNumbers = mi.getLineNumbers();
+        if ((lineNumbers != null) && (lineNumbers.length > 0)) {
+          line = lineNumbers[0]; 
+        } else {
+          line = 0; 
+        }
+         
+        ((HTMLPublisher) publisher).writeSourceAnchor(pw, mi.getSourceFileName(), line);
+
+        pw.print(HTMLPublisher.escape(mi.getLongName()));
+        pw.println("</a></td>");
+
+        pw.print("            ");
+
+        printCoverage(insnCoverage);
+        printCoverage(lineCoverage);
+        printCoverage(mc.getCoveredBasicBlocks());
+        printCoverage(branchCoverage);
+
+        pw.println();
+        HTMLPublisher.writeTableTreeNodeEnd(pw);
+
+      }
+    }
+
+    void printRequirementsCoverage() {
+      HashMap<String, Integer> reqMethods = getGlobalRequirementsMethods();
+
+      Coverage bbAll = new Coverage(0, 0);
+      Coverage insnAll = new Coverage(0, 0);
+      Coverage branchAll = new Coverage(0, 0);
+      Coverage mthAll = new Coverage(0, 0);
+      Coverage reqAll = new Coverage(0, 0);
+
+      reqAll.total = reqMethods.size();
+      mthAll.total = computeTotalRequirementsMethods(reqMethods);
+
+      pw.println("      <p><b>Requirements Coverage</b></p>");
+      pw.println("      <table>");
+      pw.println("         <tr><th colspan=\"4\">Instructions</th><th colspan=\"4\">Basic Block</th><th colspan=\"4\">Branch</th><th colspan=\"4\">Methods</th><th colspan=\"4\">Requirement</th></tr>");
+
+      for (String id : Misc.getSortedKeyStrings(reqMethods)) {
+
+        Coverage bbCoverage = new Coverage(0, 0);
+        Coverage insnCoverage = new Coverage(0, 0);
+        Coverage branchCoverage = new Coverage(0, 0);
+        Coverage reqMth = new Coverage(reqMethods.get(id), 0);
+
+        if (requirements != null && requirements.containsKey(id)) {
+          reqAll.covered++;
+          for (MethodCoverage mc : requirements.get(id)) {
+            insnCoverage.add(mc.getCoveredInsn());
+            bbCoverage.add(mc.getCoveredBasicBlocks());
+            branchCoverage.add(mc.getCoveredBranches());
+
+            mthAll.covered++;
+            reqMth.covered++;
+          }
+
+          pw.print("         <tr>");
+
+          printCoverage(insnCoverage);
+          printCoverage(bbCoverage);
+          printCoverage(branchCoverage);
+          printCoverage(reqMth);
+          pw.print("\"" + id + "\"");
+
+          pw.print("</tr>");
+
+          pw.println();
+
+          if (showMethods) {
+            for (MethodCoverage mc : requirements.get(id)) {
+
+              pw.print("         <tr>");
+
+              printCoverage(mc.getCoveredInsn());
+              printCoverage(mc.getCoveredBasicBlocks());
+              printCoverage(mc.getCoveredBranches());
+
+              pw.print("<td align=\"left\" colspan=\"4\" style=\"padding-right: 10px;\">");
+
+              pw.print(mc.getMethodInfo().getFullName());
+
+              pw.print("</tr>");
+
+              pw.println();
+            }
+          }
+        } else { // requirement not covered
+          pw.print("         <tr><td colspan=\"4\"></td><td colspan=\"4\"></td><td colspan=\"4\"></td>");
+
+          printCoverage(reqMth);
+          pw.print("\"" + id + "\"");
+
+          pw.print("</tr>");
+
+          pw.println();
+        }
+
+        insnAll.add(insnCoverage);
+        bbAll.add(bbCoverage);
+        branchAll.add(branchCoverage);
+      }
+
+      pw.print("         <tr>");
+
+      printCoverage(insnAll);
+      printCoverage(bbAll);
+      printCoverage(branchAll);
+      printCoverage(mthAll);
+      printCoverage(reqAll);
+      pw.print(" total");
+
+      pw.println("</tr>");
+      pw.println("      </table>");
+    }
+
+  }
+
   class PublishConsole extends Publish {
     PublishConsole (ConsolePublisher p){
       super(p);
     }
 
-    @Override
-	void publish() {
+    void publish() {
       publisher.publishTopicStart("coverage statistics");
 
       printClassCoverages();
@@ -887,8 +1278,7 @@ public class CoverageAnalyzer extends ListenerAdapter implements PublisherExtens
     }
 
 
-    @Override
-	void printClassCoverages() {
+    void printClassCoverages() {
       String space = "  ";
       Coverage clsCoverage = new Coverage(0, 0);
       Coverage mthCoverage = new Coverage(0, 0);
@@ -948,8 +1338,7 @@ public class CoverageAnalyzer extends ListenerAdapter implements PublisherExtens
 
     }
 
-    @Override
-	void printRequirementsCoverage() {
+    void printRequirementsCoverage() {
       HashMap<String, Integer> reqMethods = getGlobalRequirementsMethods();
 
       String space = "  ";
@@ -1055,8 +1444,7 @@ public class CoverageAnalyzer extends ListenerAdapter implements PublisherExtens
       ArrayList<Map.Entry<MethodInfo, MethodCoverage>> mthEntries =
               Misc.createSortedEntryList(cc.methods, new Comparator<Map.Entry<MethodInfo, MethodCoverage>>() {
 
-        @Override
-		public int compare(Map.Entry<MethodInfo, MethodCoverage> o1,
+        public int compare(Map.Entry<MethodInfo, MethodCoverage> o1,
                 Map.Entry<MethodInfo, MethodCoverage> o2) {
           int a = o2.getValue().getCoveredInsn().percent();
           int b = o1.getValue().getCoveredInsn().percent();
@@ -1205,14 +1593,12 @@ public class CoverageAnalyzer extends ListenerAdapter implements PublisherExtens
   }
 
 
-  @Override
   public void publishFinished(Publisher publisher) {
 
     if (clsEntries == null) {
       clsEntries = Misc.createSortedEntryList(classes, new Comparator<Map.Entry<String, ClassCoverage>>() {
 
-        @Override
-		public int compare(Map.Entry<String, ClassCoverage> o1,
+        public int compare(Map.Entry<String, ClassCoverage> o1,
                 Map.Entry<String, ClassCoverage> o2) {
           return o2.getKey().compareTo(o1.getKey());
         }
@@ -1223,6 +1609,8 @@ public class CoverageAnalyzer extends ListenerAdapter implements PublisherExtens
 
     if (publisher instanceof ConsolePublisher) {
       new PublishConsole((ConsolePublisher) publisher).publish();
+    } else if (publisher instanceof HTMLPublisher) {
+      new PublishHtml((HTMLPublisher) publisher).publish();
     }
   }
 }

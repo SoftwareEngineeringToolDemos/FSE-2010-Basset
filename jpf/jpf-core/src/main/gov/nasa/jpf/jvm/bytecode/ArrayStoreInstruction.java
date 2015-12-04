@@ -1,30 +1,28 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.jvm.bytecode;
 
-import gov.nasa.jpf.vm.bytecode.StoreInstruction;
-import gov.nasa.jpf.vm.ArrayIndexOutOfBoundsExecutiveException;
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.MJIEnv;
-import gov.nasa.jpf.vm.Scheduler;
-import gov.nasa.jpf.vm.StackFrame;
-import gov.nasa.jpf.vm.ThreadInfo;
+import gov.nasa.jpf.jvm.ArrayIndexOutOfBoundsExecutiveException;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.KernelState;
+import gov.nasa.jpf.jvm.SystemState;
+import gov.nasa.jpf.jvm.ThreadInfo;
 
 
 /**
@@ -32,96 +30,71 @@ import gov.nasa.jpf.vm.ThreadInfo;
  *
  *  ... array, index, <value> => ...
  */
-public abstract class ArrayStoreInstruction extends JVMArrayElementInstruction implements StoreInstruction, JVMInstruction {
+public abstract class ArrayStoreInstruction extends ArrayInstruction implements StoreInstruction {
 
+  public Instruction execute (SystemState ss, KernelState ks, ThreadInfo ti) {
+    int aref = peekArrayRef(ti); // need to be poly, could be LongArrayStore
+    if (aref == -1) {
+      return ti.createAndThrowException("java.lang.NullPointerException");
+    }
 
-  @Override
-  public Instruction execute (ThreadInfo ti) {
-    StackFrame frame = ti.getModifiableTopFrame();
-    int idx = peekIndex(ti);
-    int aref = peekArrayRef(ti); // need to be polymorphic, could be LongArrayStore
-    ElementInfo eiArray = ti.getElementInfo(aref);
+    ElementInfo e = ti.getElementInfo(aref);
 
-    arrayOperandAttr = peekArrayAttr(ti);
-    indexOperandAttr = peekIndexAttr(ti);
-
-    if (!ti.isFirstStepInsn()){ // first execution, top half
-      //--- runtime exceptions
-      if (aref == MJIEnv.NULL) {
-        return ti.createAndThrowException("java.lang.NullPointerException");
-      }
-    
-      //--- shared access CG
-      Scheduler scheduler = ti.getScheduler();
-      if (scheduler.canHaveSharedArrayCG(ti, this, eiArray, idx)){
-        eiArray = scheduler.updateArraySharedness(ti, eiArray, idx);
-        if (scheduler.setsSharedArrayCG(ti, this, eiArray, idx)){
-          return this;
-        }
+    if (isNewPorBoundary(e, ti)) {
+      if (createAndSetArrayCG(ss,e,ti, aref, peekIndex(ti), false)) {
+        return this;
       }
     }
-    
+
+    int esize = getElementSize();
+    Object attr = esize == 1 ? ti.getOperandAttr() : ti.getLongOperandAttr();
+
+    popValue(ti);
+    index = ti.pop();
+    // don't set 'arrayRef' before we do the CG check (would kill loop optimization)
+    arrayRef = ti.pop();
+
+    Instruction xInsn = checkArrayStoreException(ti, e);
+    if (xInsn != null){
+      return xInsn;
+    }
+
     try {
-      setArrayElement(ti, frame, eiArray); // this pops operands
+      setField(e, index);
+      e.setElementAttrNoClone(index,attr); // <2do> what if the value is the same but not the attr?
+      return getNext(ti);
+
     } catch (ArrayIndexOutOfBoundsExecutiveException ex) { // at this point, the AIOBX is already processed
       return ex.getInstruction();
     }
-
-    return getNext(ti);
   }
 
-  protected void setArrayElement (ThreadInfo ti, StackFrame frame, ElementInfo eiArray) throws ArrayIndexOutOfBoundsExecutiveException {
-    int esize = getElementSize();
-    Object attr = esize == 1 ? frame.getOperandAttr() : frame.getLongOperandAttr();
-    
-    popValue(frame);
-    index = frame.pop();
-    // don't set 'arrayRef' before we do the CG checks (would kill loop optimization)
-    arrayRef = frame.pop();
-
-    eiArray = eiArray.getModifiableInstance();
-    setField(eiArray, index);
-    eiArray.setElementAttrNoClone(index,attr); // <2do> what if the value is the same but not the attr?
-  }
-  
   /**
    * this is for pre-exec use
    */
-  @Override
-  public int peekArrayRef(ThreadInfo ti) {
-    return ti.getTopFrame().peek(2);
+  protected int peekArrayRef(ThreadInfo ti) {
+    return ti.peek(2);
   }
 
-  @Override
-  public int peekIndex(ThreadInfo ti){
-    return ti.getTopFrame().peek(1);
+  protected int peekIndex(ThreadInfo ti){
+    return ti.peek(1);
   }
 
-  // override in LongArrayStoreInstruction
-  @Override
-  public Object  peekArrayAttr (ThreadInfo ti){
-    return ti.getTopFrame().getOperandAttr(2);
+  protected Instruction checkArrayStoreException(ThreadInfo ti, ElementInfo ei){
+    return null;
   }
 
-  @Override
-  public Object peekIndexAttr (ThreadInfo ti){
-    return ti.getTopFrame().getOperandAttr(1);
-  }
+  protected abstract void popValue(ThreadInfo ti);
 
-
-  protected abstract void popValue(StackFrame frame);
- 
   protected abstract void setField (ElementInfo e, int index)
                     throws ArrayIndexOutOfBoundsExecutiveException;
 
 
-  @Override
   public boolean isRead() {
     return false;
   }
   
-  @Override
-  public void accept(JVMInstructionVisitor insVisitor) {
+  public void accept(InstructionVisitor insVisitor) {
 	  insVisitor.visit(this);
   }
 

@@ -1,20 +1,21 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2009 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 
 package gov.nasa.jpf.listener;
 
@@ -22,14 +23,13 @@ import gov.nasa.jpf.Config;
 import gov.nasa.jpf.JPF;
 import gov.nasa.jpf.JPFConfigException;
 import gov.nasa.jpf.ListenerAdapter;
-import gov.nasa.jpf.jvm.bytecode.JVMInvokeInstruction;
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.ClassLoaderInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.MethodInfo;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.Types;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.MethodInfo;
+import gov.nasa.jpf.jvm.ThreadInfo;
+import gov.nasa.jpf.jvm.Types;
+import gov.nasa.jpf.jvm.bytecode.Instruction;
+import gov.nasa.jpf.jvm.bytecode.InvokeInstruction;
 
 import java.util.HashMap;
 
@@ -38,9 +38,9 @@ import java.util.HashMap;
  * tool is meant to be used for exception handler verification, esp. if
  * exceptions thrown by 3rd party code would be hard to produce.
  *
- * Exceptions are specified as a list of xSpec'@'location pairs.
+ * Exceptions are specified as a list of type'@'location pairs.
  *
- * ExceptionSpec is specified as a class name, with optional details parameter. If no
+ * Type is specified as a class name, with optional details parameter. If no
  * package is specified, either java.lang or default package are assumed
  *
  * Location can be 
@@ -67,13 +67,13 @@ public class ExceptionInjector extends ListenerAdapter {
 
   static class ExceptionEntry {
     Instruction insn;
-    ExceptionSpec xSpec;
+    Type type;
     Location loc;
 
     ExceptionEntry next;  // there might be more than one for one class
 
-    ExceptionEntry (ExceptionSpec xSpec, Location loc, ExceptionEntry next){
-      this.xSpec = xSpec;
+    ExceptionEntry (Type type, Location loc, ExceptionEntry next){
+      this.type = type;
       this.loc = loc;
       this.next = next;
     }
@@ -90,35 +90,33 @@ public class ExceptionInjector extends ListenerAdapter {
       return loc.line;
     }
 
-    ClassInfo getExceptionClassInfo(ThreadInfo ti) {
-      return ClassLoaderInfo.getCurrentResolvedClassInfo(xSpec.xClsName);
+    ClassInfo getExceptionClassInfo() {
+      return type.ci;
     }
 
     String getExceptionDetails() {
-      return xSpec.details;
+      return type.details;
     }
 
-    @Override
-	public String toString() {
-      return xSpec.toString() + '@' + loc.toString();
+    public String toString() {
+      return type.toString() + '@' + loc.toString();
     }
   }
 
-  static class ExceptionSpec {
-    String xClsName;
+  static class Type {
+    ClassInfo ci;
     String details;
 
-    ExceptionSpec (String xClsName, String details){
-      this.xClsName = xClsName;
+    Type (ClassInfo ci, String details){
+      this.ci = ci;
       this.details = details;
     }
-    
-    @Override
-	public String toString() {
+
+    public String toString() {
       if (details == null){
-        return xClsName;
+        return ci.getName();
       } else {
-        StringBuilder sb = new StringBuilder(xClsName);
+        StringBuilder sb = new StringBuilder(ci.getName());
         sb.append('(');
         if (!details.isEmpty()){
           sb.append('"');
@@ -142,8 +140,7 @@ public class ExceptionInjector extends ListenerAdapter {
       this.line = line;
     }
 
-    @Override
-	public String toString() {
+    public String toString() {
       StringBuilder sb = new StringBuilder(className);
       if (method != null){
         sb.append('.');
@@ -160,11 +157,14 @@ public class ExceptionInjector extends ListenerAdapter {
   // these two are used to process classes at loadtime
   HashMap<String,ExceptionEntry> targetClasses = new HashMap<String,ExceptionEntry>();
   HashMap<String,ExceptionEntry> targetBases = new HashMap<String,ExceptionEntry>();
-  
-  // methods and instructions to watch for at runtime will have ExceptionEntry attrs
+
+  // these are the ones we watch during execution
+  HashMap<Instruction,ExceptionEntry> targetInstructions = new HashMap<Instruction,ExceptionEntry>();
+  HashMap<MethodInfo,ExceptionEntry> targetMethods = new HashMap<MethodInfo,ExceptionEntry>();
 
 
   public ExceptionInjector (Config config, JPF jpf){
+
     throwFirst = config.getBoolean("ei.throw_first", false);
     String[] xSpecs = config.getStringArray("ei.exception", new char[] {';'});
 
@@ -185,7 +185,7 @@ public class ExceptionInjector extends ListenerAdapter {
       String typeSpec = xSpec.substring(0, i).trim();
       String locSpec = xSpec.substring(i+1).trim();
 
-      ExceptionSpec type = parseType(typeSpec);
+      Type type = parseType(typeSpec);
       if (type != null){
         Location loc = parseLocation(locSpec);
         if (loc != null){
@@ -204,7 +204,7 @@ public class ExceptionInjector extends ListenerAdapter {
     return false;
   }
 
-  ExceptionSpec parseType (String spec){
+  Type parseType (String spec){
     String cls = null;
     String details = null;
 
@@ -229,7 +229,16 @@ public class ExceptionInjector extends ListenerAdapter {
     }
 
     if (cls != null){
-      return new ExceptionSpec( cls,details);
+      ClassInfo ci = ClassInfo.tryGetResolvedClassInfo(cls);
+      if (ci == null){ // try java.lang if no package
+        if (cls.indexOf('.')< 0){
+          cls = "java.lang." + cls;
+          ci = ClassInfo.tryGetResolvedClassInfo(cls);
+        }
+      }
+      if (ci != null){
+        return new Type(ci,details);
+      }
     }
 
     return null;
@@ -287,7 +296,7 @@ public class ExceptionInjector extends ListenerAdapter {
             i--;
           }
 
-          mi.getInstruction(i).addAttr(e);
+          targetInstructions.put( mi.getInstruction(i), e);
           return true;
         }
       }
@@ -299,16 +308,16 @@ public class ExceptionInjector extends ListenerAdapter {
   /**
    * get the target insns/methods
    */
-  @Override
-  public void classLoaded (VM vm, ClassInfo loadedClass){
+  public void classLoaded (JVM vm){
+    ClassInfo ci = vm.getLastClassInfo();
 
     nextClassEntry:
-    for (ExceptionEntry e = targetClasses.get(loadedClass.getName()); e != null; e = e.next){
+    for (ExceptionEntry e = targetClasses.get(ci.getName()); e != null; e = e.next){
       String method = e.getMethod();
       int line = e.getLine();
 
       if (method != null){  // method or method/line-offset
-        for (MethodInfo mi : loadedClass.getDeclaredMethodInfos()){
+        for (MethodInfo mi : ci.getDeclaredMethodInfos()){
           if (mi.getUniqueName().startsWith(method)){
             if (line >= 0){ // line offset
               int[] ln = mi.getLineNumbers();
@@ -322,7 +331,7 @@ public class ExceptionInjector extends ListenerAdapter {
 
       } else { // absolute line number
         if (line >= 0){
-          for (MethodInfo mi : loadedClass.getDeclaredMethodInfos()) {
+          for (MethodInfo mi : ci.getDeclaredMethodInfos()) {
             int[] ln = mi.getLineNumbers();
             if (checkTargetInsn(e, mi, ln, line)) {
               continue nextClassEntry;
@@ -333,13 +342,13 @@ public class ExceptionInjector extends ListenerAdapter {
     }
 
     if (targetBases != null){
-      for (; loadedClass != null; loadedClass = loadedClass.getSuperClass()) {
+      for (; ci != null; ci = ci.getSuperClass()) {
         nextBaseEntry:
-        for (ExceptionEntry e = targetBases.get(loadedClass.getName()); e != null; e = e.next){
+        for (ExceptionEntry e = targetBases.get(ci.getName()); e != null; e = e.next){
           String method = e.getMethod();
-          for (MethodInfo mi : loadedClass.getDeclaredMethodInfos()){
+          for (MethodInfo mi : ci.getDeclaredMethodInfos()){
             if (mi.getUniqueName().startsWith(method)){
-              mi.addAttr(e);
+              targetMethods.put(mi, e);
               continue nextBaseEntry;
             }
           }
@@ -348,22 +357,23 @@ public class ExceptionInjector extends ListenerAdapter {
     }
   }
 
-  @Override
-  public void executeInstruction (VM vm, ThreadInfo ti, Instruction insnToExecute){
+  public void executeInstruction (JVM vm){
+    ThreadInfo ti = vm.getLastThreadInfo();
+    Instruction insn = vm.getLastInstruction();
 
-    ExceptionEntry e = insnToExecute.getAttr(ExceptionEntry.class);
-    if ((e == null) && insnToExecute instanceof JVMInvokeInstruction){
-      MethodInfo mi = ((JVMInvokeInstruction) insnToExecute).getInvokedMethod();
-      e = mi.getAttr(ExceptionEntry.class);
+    ExceptionEntry e = targetInstructions.get(insn);
+    if ((e == null) && insn instanceof InvokeInstruction){
+      MethodInfo mi = ((InvokeInstruction) insn).getInvokedMethod();
+      e = targetMethods.get(mi);
     }
 
     if (e != null){
-      Instruction nextInsn = ti.createAndThrowException(e.getExceptionClassInfo(ti), e.getExceptionDetails());
+      Instruction nextInsn = ti.createAndThrowException(e.getExceptionClassInfo(), e.getExceptionDetails());
       ti.skipInstruction(nextInsn);
       return;
     }
   }
-  
+
   // for debugging purposes
   void printEntries () {
     for (ExceptionEntry e : targetClasses.values()){

@@ -1,20 +1,21 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2008 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.listener;
 
 import gov.nasa.jpf.Config;
@@ -22,11 +23,9 @@ import gov.nasa.jpf.JPF;
 import gov.nasa.jpf.ListenerAdapter;
 import gov.nasa.jpf.annotation.JPFOption;
 import gov.nasa.jpf.annotation.JPFOptions;
+import gov.nasa.jpf.jvm.JVM;
 import gov.nasa.jpf.report.Publisher;
 import gov.nasa.jpf.search.Search;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.VM;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
@@ -39,7 +38,7 @@ import java.lang.management.MemoryUsage;
   @JPFOption(type = "Long", key = "budget.max_time", defaultValue= "-1", comment = "stop search after specified duration [msec]"),
   @JPFOption(type = "Long", key = "budget.max_heap", defaultValue = "-1", comment="stop search when VM heapsize reaches specified limit"),
   @JPFOption(type = "Int", key = "budget.max_depth", defaultValue = "-1", comment = "stop search at specified search depth"),
-  @JPFOption(type = "long", key = "budget.max_insn", defaultValue = "-1", comment = "stop search after specified number of intstructions"),
+  @JPFOption(type = "Long", key = "budget.max_insn", defaultValue = "-1", comment = "stop search after specified number of intstructions"),
   @JPFOption(type = "Int", key = "budget.max_state", defaultValue = "-1", comment = "stop search when reaching specified number of new states"),
   @JPFOption(type = "Int", key = "budget.max_new_states", defaultValue = "-1", comment="stop search ater specified number of non-replayed new states")
 })
@@ -53,17 +52,17 @@ public class BudgetChecker extends ListenerAdapter {
   long mStart;
   MemoryMXBean mxb;
   
-  VM vm;
+  JVM vm;
   Search search;
   long insnCount;
 
   //--- the budget thresholds
   long maxTime;
+  long maxState;
+  long maxDepth;
+  long maxInsn;
   long maxHeap;
   
-  int maxDepth;
-  long maxInsn;
-  int maxState;
   int maxNewStates;
   
   int newStates;
@@ -72,14 +71,13 @@ public class BudgetChecker extends ListenerAdapter {
   String message;
   
   public BudgetChecker (Config conf, JPF jpf) {
+    maxTime = conf.getDuration("budget.max_time", -1);
+    maxHeap = conf.getMemorySize("budget.max_heap", -1);
+    maxDepth = conf.getLong("budget.max_depth", -1);
+    maxInsn = conf.getLong("budget.max_insn", -1);
+    maxState = conf.getLong("budget.max_state", -1);
     
-    //--- get the configured budget limits (0 means not set)
-    maxTime = conf.getDuration("budget.max_time", 0);
-    maxHeap = conf.getMemorySize("budget.max_heap", 0);
-    maxDepth = conf.getInt("budget.max_depth", 0);
-    maxInsn = conf.getLong("budget.max_insn", 0);
-    maxState = conf.getInt("budget.max_state", 0);
-    maxNewStates = conf.getInt("budget.max_new_states", 0);
+    maxNewStates = conf.getInt("budget.max_new_states", -1);
     
     tStart = System.currentTimeMillis();
     
@@ -155,16 +153,13 @@ public class BudgetChecker extends ListenerAdapter {
   }
   
   public boolean newStatesExceeded(){
-    if (maxNewStates > 0){
-      if (newStates > maxNewStates) {
-        message = "max new state count exceeded: " + maxNewStates;
-        return true;
-      }
+    if (newStates > maxNewStates) {
+      message = "max new state count exceeded: "  + maxNewStates;
+      return true;
     }
     return false;
   }
   
-  @Override
   public void stateAdvanced (Search search) {    
     if (timeExceeded() || heapExceeded()) {
       search.notifySearchConstraintHit(message);
@@ -182,14 +177,13 @@ public class BudgetChecker extends ListenerAdapter {
     }
   }
       
-  @Override
-  public void instructionExecuted (VM vm, ThreadInfo ti, Instruction nextInsn, Instruction executedInsn) {
+  public void instructionExecuted (JVM vm) {
     if ((insnCount++ % CHECK_INTERVAL) == CHECK_INTERVAL1) {
 
       if (timeExceeded() || heapExceeded() || insnExceeded()) {
         search.notifySearchConstraintHit(message);
 
-        vm.getCurrentThread().breakTransition("budgetConstraint");
+        vm.getCurrentThread().breakTransition();
         search.terminate();
       }    
     }

@@ -1,22 +1,25 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2010 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 
 package gov.nasa.jpf.util;
+
+import gov.nasa.jpf.JPFException;
 
 
 /**
@@ -30,11 +33,12 @@ package gov.nasa.jpf.util;
  * Instances of this class do not allocate any additional memory, we keep all
  * data in builtin type fields
  */
-public class BitSet1024 extends AbstractFixedBitSet {
+public class BitSet1024 implements FixedBitSet, Cloneable {
 
   public static final int INDEX_MASK = 0xfffffc00;
 
   long l0, l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12, l13, l14, l15;
+  int cardinality;
 
   public BitSet1024 (){
     // nothing in here
@@ -47,6 +51,40 @@ public class BitSet1024 extends AbstractFixedBitSet {
   public BitSet1024 (int... idx){
     for (int i : idx){
       set(i);
+    }
+  }
+
+  public int longSize(){
+    return  4;
+  }
+  public long getLong(int i){
+    switch (i){
+      case 0: return l0;
+      case 1: return l1;
+      case 2: return l2;
+      case 3: return l3;
+      case 4: return l4;
+      case 5: return l5;
+      case 6: return l6;
+      case 7: return l7;
+      case 8: return l8;
+      case 9: return l9;
+      case 10: return l10;
+      case 11: return l11;
+      case 12: return l12;
+      case 13: return l13;
+      case 14: return l14;
+      case 15: return l15;
+      default:
+        throw new IndexOutOfBoundsException("BitSet1022 has no long index " + i);
+    }
+  }
+
+  public BitSet1024 clone() {
+    try {
+      return (BitSet1024) super.clone();
+    } catch (CloneNotSupportedException ex) {
+      throw new JPFException("BitSet1024 clone failed");
     }
   }
 
@@ -72,7 +110,6 @@ public class BitSet1024 extends AbstractFixedBitSet {
 
   //--- public interface (much like java.util.BitSet)
 
-  @Override
   public void set (int i){
     if ((i & INDEX_MASK) == 0) {
       long bitPattern = (1L << i);
@@ -179,7 +216,6 @@ public class BitSet1024 extends AbstractFixedBitSet {
     }
   }
 
-  @Override
   public void clear (int i){
     if ((i & INDEX_MASK) == 0) {
       long bitPattern = (1L << i);
@@ -285,7 +321,14 @@ public class BitSet1024 extends AbstractFixedBitSet {
     }
   }
 
-  @Override
+  public void set (int i, boolean val){
+    if (val) {
+      set(i);
+    } else {
+      clear(i);
+    }
+  }
+
   public boolean get (int i){
     if ((i & INDEX_MASK) == 0) {
       long bitPattern = (1L << i);
@@ -329,15 +372,18 @@ public class BitSet1024 extends AbstractFixedBitSet {
     throw new IndexOutOfBoundsException("BitSet1024 index out of range: " + i);
   }
 
-  @Override
-  public int size() {
-    return 1024;
+  public int cardinality() {
+    return cardinality;
   }
+  
+  public int size() {
+    return cardinality;
+  }
+
 
   /**
    * number of bits we can store
    */
-  @Override
   public int capacity() {
     return 1024;
   }
@@ -345,7 +391,6 @@ public class BitSet1024 extends AbstractFixedBitSet {
   /**
    * index of highest set bit + 1
    */
-  @Override
   public int length() {
    if (l15 != 0){
 	  return 1024 - Long.numberOfLeadingZeros(l15);
@@ -384,7 +429,10 @@ public class BitSet1024 extends AbstractFixedBitSet {
    }
   }
 
-  @Override
+  public boolean isEmpty() {
+    return (cardinality == 0);
+  }
+
   public void clear() {
     l0 = l1 = l2 = l3 = l4 = l5 = l6 = l7
     = l8 = l9= l10 = l11 = l12 = l13 = l14
@@ -393,7 +441,6 @@ public class BitSet1024 extends AbstractFixedBitSet {
   }
 
 
-  @Override
   public int nextSetBit (int fromIdx){
     if ((fromIdx & INDEX_MASK) == 0) {
       int i;
@@ -574,7 +621,6 @@ public class BitSet1024 extends AbstractFixedBitSet {
     return -1;
   }
 
-  @Override
   public int nextClearBit (int fromIdx){
     if ((fromIdx & INDEX_MASK) == 0) {
       int i;
@@ -821,7 +867,6 @@ public class BitSet1024 extends AbstractFixedBitSet {
     cardinality = computeCardinality();
   }
 
-  @Override
   public boolean equals (Object o){
     if (o instanceof BitSet1024){
       BitSet1024 other = (BitSet1024)o;
@@ -849,10 +894,13 @@ public class BitSet1024 extends AbstractFixedBitSet {
     }
   }
 
+  public void hash(HashData hd){
+    hd.add(hashCode());
+  }
+
   /**
    * answer the same hashCodes as java.util.BitSet
    */
-  @Override
   public int hashCode() {
     long hc = 1234;
     hc ^= l0;
@@ -873,24 +921,22 @@ public class BitSet1024 extends AbstractFixedBitSet {
     return (int) ((hc >>32) ^ hc);
   }
 
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append('{');
 
-  @Override
-  public void hash (HashData hd){
-    hd.add(l0);
-    hd.add(l1);
-    hd.add(l2);
-    hd.add(l3);
-    hd.add(l4);
-    hd.add(l5);
-    hd.add(l6);
-    hd.add(l7);
-    hd.add(l8);
-    hd.add(l9);
-    hd.add(l10);
-    hd.add(l11);
-    hd.add(l12);
-    hd.add(l13);
-    hd.add(l14);
-    hd.add(l15);
-  }  
+    boolean first = true;
+    for (int i=nextSetBit(0); i>= 0; i = nextSetBit(i+1)){
+      if (!first){
+        sb.append(',');
+      } else {
+        first = false;
+      }
+      sb.append(i);
+    }
+
+    sb.append('}');
+
+    return sb.toString();
+  }
 }

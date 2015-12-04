@@ -1,20 +1,21 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright  (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+//  (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+//  (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 
 package java.io;
 
@@ -27,8 +28,7 @@ import java.nio.channels.FileChannel;
 public class FileInputStream extends InputStream {
 
   FileDescriptor fd;
-  private FileChannel fc = null;
-
+  
   public FileInputStream (String fname) throws FileNotFoundException {
     try {
       fd = new FileDescriptor(fname, FileDescriptor.FD_READ);
@@ -45,16 +45,12 @@ public class FileInputStream extends InputStream {
     this.fd = fd;
   }
   
-  @Override
   public int read(byte b[]) throws IOException {
     return read(b,0,b.length);
   }
 
   public FileChannel getChannel() {
-    if(this.fc ==null){
-      this.fc = new FileChannel(fd);
-    }
-    return this.fc;
+    return null; // <2do> not yet supported
   }
   
   //--- our native peer methods
@@ -64,27 +60,22 @@ public class FileInputStream extends InputStream {
     return false;
   }
   
-  @Override
   public int read() throws IOException {
     return fd.read();
   }
 
-  @Override
   public int read(byte b[], int off, int len) throws IOException {
     return fd.read(b,off,len);
   }
   
-  @Override
   public long skip(long n) throws IOException {
     return fd.skip(n);
   }
 
-  @Override
   public int available () throws IOException {
     return fd.available();
   }
   
-  @Override
   public void close () throws IOException {
     fd.close();
   }

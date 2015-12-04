@@ -18,7 +18,7 @@
 //
 package gov.nasa.jpf.actor;
 
-import gov.nasa.jpf.vm.MJIEnv;
+import gov.nasa.jpf.jvm.MJIEnv;
 
 /**
  * 

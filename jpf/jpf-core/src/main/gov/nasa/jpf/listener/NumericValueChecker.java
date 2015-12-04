@@ -1,37 +1,45 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2010 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 
 package gov.nasa.jpf.listener;
 
-import gov.nasa.jpf.vm.Instruction;
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.JPFConfigException;
 import gov.nasa.jpf.PropertyListenerAdapter;
-import gov.nasa.jpf.jvm.bytecode.*;
+import gov.nasa.jpf.jvm.FieldInfo;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.LocalVarInfo;
+import gov.nasa.jpf.jvm.MethodInfo;
+import gov.nasa.jpf.jvm.StackFrame;
+import gov.nasa.jpf.jvm.ThreadInfo;
+import gov.nasa.jpf.jvm.bytecode.DSTORE;
+import gov.nasa.jpf.jvm.bytecode.FSTORE;
+import gov.nasa.jpf.jvm.bytecode.FieldInstruction;
+import gov.nasa.jpf.jvm.bytecode.ISTORE;
+import gov.nasa.jpf.jvm.bytecode.InstructionVisitorAdapter;
+import gov.nasa.jpf.jvm.bytecode.LSTORE;
+import gov.nasa.jpf.jvm.bytecode.LocalVariableInstruction;
+import gov.nasa.jpf.jvm.bytecode.PUTFIELD;
+import gov.nasa.jpf.jvm.bytecode.PUTSTATIC;
 import gov.nasa.jpf.search.Search;
 import gov.nasa.jpf.util.FieldSpec;
 import gov.nasa.jpf.util.VarSpec;
-import gov.nasa.jpf.vm.FieldInfo;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.LocalVarInfo;
-import gov.nasa.jpf.vm.MethodInfo;
-import gov.nasa.jpf.vm.StackFrame;
-import gov.nasa.jpf.vm.ThreadInfo;
 
 /**
  * little listener that checks value ranges of specified numeric fields and local vars
@@ -102,9 +110,9 @@ public class NumericValueChecker extends PropertyListenerAdapter {
     }
   }
   
-  class Visitor extends JVMInstructionVisitorAdapter {
+  class Visitor extends InstructionVisitorAdapter {
     
-    void checkFieldInsn (JVMFieldInstruction insn){
+    void checkFieldInsn (FieldInstruction insn){
       if (fieldChecks != null){
         FieldInfo fi = insn.getFieldInfo();
 
@@ -119,7 +127,7 @@ public class NumericValueChecker extends PropertyListenerAdapter {
               if (errorCond != null) {
                 error = String.format("field %s out of range: %s\n\t at %s",
                         fi.getFullName(), errorCond, insn.getSourceLocation());
-                vm.breakTransition("fieldValueOutOfRange"); // terminate this transition
+                vm.breakTransition(); // terminate this transition
                 break;
               }
             }
@@ -128,9 +136,9 @@ public class NumericValueChecker extends PropertyListenerAdapter {
       }
     }
 
-    void checkVarInsn (JVMLocalVariableInstruction insn){
+    void checkVarInsn (LocalVariableInstruction insn){
       if (varChecks != null){
-        ThreadInfo ti = ThreadInfo.getCurrentThread();
+        ThreadInfo ti = vm.getLastThreadInfo();
         StackFrame frame = ti.getTopFrame();
         int slotIdx = insn.getLocalVariableIndex();
 
@@ -148,7 +156,7 @@ public class NumericValueChecker extends PropertyListenerAdapter {
             if (errorCond != null) {
               error = String.format("local variable %s out of range: %s\n\t at %s",
                       lvar.getName(), errorCond, insn.getSourceLocation());
-              vm.breakTransition("localVarValueOutOfRange"); // terminate this transition
+              vm.breakTransition(); // terminate this transition
               break;
             }
           }
@@ -185,7 +193,7 @@ public class NumericValueChecker extends PropertyListenerAdapter {
   }
 
 
-  VM vm;
+  JVM vm;
   Visitor visitor;
 
   // the stuff we monitor
@@ -254,13 +262,13 @@ public class NumericValueChecker extends PropertyListenerAdapter {
   }
 
   @Override
-  public void instructionExecuted (VM vm, ThreadInfo ti, Instruction nextInsn, Instruction executedInsn){
+  public void instructionExecuted (JVM vm){
     this.vm = vm;
-    ((JVMInstruction)executedInsn).accept(visitor);
+    vm.getLastInstruction().accept(visitor);
   }
 
   @Override
-  public boolean check(Search search, VM vm) {
+  public boolean check(Search search, JVM vm) {
     return (error == null);
   }
 

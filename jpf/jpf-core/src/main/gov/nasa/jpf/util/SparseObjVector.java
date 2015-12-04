@@ -1,20 +1,21 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.util;
 
 import static java.lang.Integer.MIN_VALUE;
@@ -26,7 +27,7 @@ import java.util.Arrays;
  * instead of an array.  Also, does not require allocation with each add. 
  */
 public class SparseObjVector<E> {
-  private static final boolean DEBUG = false; 
+  private static final boolean DEBUG = true; 
   
   static final double MAX_LOAD_WIPE = 0.6;
   static final double MAX_LOAD_REHASH = 0.4;
@@ -133,12 +134,8 @@ public class SparseObjVector<E> {
     }
     // idx not in table; add it
     
-    if ((count+1) >= nextWipe) { // too full
-      if (count >= nextRehash) {
-        pow++;
-      }
-      
-      /**
+    count++;
+    if (count >= nextWipe) { // too full
       // determine if size needs to be increased or just wipe null blocks
       int oldCount = count;
       count = 0;
@@ -157,8 +154,6 @@ public class SparseObjVector<E> {
           System.out.println("Rehash reclaiming this many nulls: " + (oldCount - count));
         }
       }
-      **/
-      
       Object[] oldValTable = valTable;
       int[] oldIdxTable = idxTable;
       newTable();
@@ -171,7 +166,7 @@ public class SparseObjVector<E> {
         int tidx = oldIdxTable[i];
         if (tidx == MIN_VALUE) continue;
         Object o = oldValTable[i];
-        //if (o == null) continue;
+        if (o == null) continue;
         // otherwise:
         code = mix(tidx);
         pos = code & mask;
@@ -193,8 +188,6 @@ public class SparseObjVector<E> {
       // pos already pointing to empty slot
     }
 
-    count++;
-    
     idxTable[pos] = idx;
     valTable[pos] = e;
   }

@@ -1,35 +1,34 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 
 package gov.nasa.jpf.test.mc.basic;
 
 import gov.nasa.jpf.ListenerAdapter;
+import gov.nasa.jpf.jvm.ChoiceGenerator;
+import gov.nasa.jpf.jvm.DoubleChoiceGenerator;
+import gov.nasa.jpf.jvm.IntChoiceGenerator;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.SystemState;
+import gov.nasa.jpf.jvm.Verify;
+import gov.nasa.jpf.jvm.choice.DoubleChoiceFromList;
+import gov.nasa.jpf.jvm.choice.IntIntervalGenerator;
 import gov.nasa.jpf.util.test.TestJPF;
-import gov.nasa.jpf.vm.ChoiceGenerator;
-import gov.nasa.jpf.vm.DoubleChoiceGenerator;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.IntChoiceGenerator;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.SystemState;
-import gov.nasa.jpf.vm.Verify;
-import gov.nasa.jpf.vm.choice.DoubleChoiceFromList;
-import gov.nasa.jpf.vm.choice.IntIntervalGenerator;
 
 import java.util.Comparator;
 
@@ -42,18 +41,20 @@ public class CGReorderTest extends TestJPF {
 
   public static class ReverseListener extends ListenerAdapter {  
     @Override
-    public void choiceGeneratorSet (VM vm, ChoiceGenerator<?> newCG){
-      if (newCG instanceof IntIntervalGenerator){
+    public void choiceGeneratorSet (JVM vm){
+      ChoiceGenerator<?> cg = vm.getLastChoiceGenerator();
+      if (cg instanceof IntIntervalGenerator){
         System.out.println("reverse choice enumeration order");
-        ((IntIntervalGenerator)newCG).reverse();
+        ((IntIntervalGenerator)cg).reverse();
       }
     }
 
     int lastVal = Integer.MAX_VALUE;
     @Override
-    public void choiceGeneratorAdvanced (VM vm, ChoiceGenerator<?> currentCG){
-      if (currentCG instanceof IntIntervalGenerator){
-        int v = ((IntChoiceGenerator)currentCG).getNextChoice();
+    public void choiceGeneratorAdvanced (JVM vm){
+      ChoiceGenerator<?> cg = vm.getLastChoiceGenerator();
+      if (cg instanceof IntIntervalGenerator){
+        int v = ((IntChoiceGenerator)cg).getNextChoice();
         if (v >= lastVal){
           fail("values not decreasing");
         }
@@ -75,18 +76,18 @@ public class CGReorderTest extends TestJPF {
     ChoiceGenerator<?> reorderedCG;
     
     @Override
-    public void choiceGeneratorRegistered (VM vm, ChoiceGenerator<?> nextCG, ThreadInfo ti, Instruction executedInsn){
+    public void choiceGeneratorRegistered (JVM vm){
+      ChoiceGenerator<?> cg = vm.getLastChoiceGenerator();
       // make sure we are not getting recursive (could also use setId())
-      if (nextCG instanceof DoubleChoiceFromList && nextCG != reorderedCG){ 
+      if (cg instanceof DoubleChoiceFromList && cg != reorderedCG){ 
         System.out.println("reorder choices");
-        reorderedCG = ((DoubleChoiceFromList)nextCG).reorder( new Comparator<Double>(){
-          @Override
-		public int compare (Double d1, Double d2){
+        reorderedCG = ((DoubleChoiceFromList)cg).reorder( new Comparator<Double>(){
+          public int compare (Double d1, Double d2){
             return (int) (d2 - d1);
           }
         });
         
-        System.out.println("replacing: " + nextCG);
+        System.out.println("replacing: " + cg);
         System.out.println("with: " + reorderedCG);
         SystemState ss = vm.getSystemState();
         ss.removeNextChoiceGenerator();
@@ -96,9 +97,10 @@ public class CGReorderTest extends TestJPF {
 
     double lastVal = Double.MAX_VALUE;
     @Override
-    public void choiceGeneratorAdvanced (VM vm, ChoiceGenerator<?> currentCG){
-      if (currentCG instanceof DoubleChoiceGenerator){
-        double v = ((DoubleChoiceGenerator)currentCG).getNextChoice();
+    public void choiceGeneratorAdvanced (JVM vm){
+      ChoiceGenerator<?> cg = vm.getLastChoiceGenerator();
+      if (cg instanceof DoubleChoiceGenerator){
+        double v = ((DoubleChoiceGenerator)cg).getNextChoice();
         if (v >= lastVal){
           fail("values not decreasing");
         }

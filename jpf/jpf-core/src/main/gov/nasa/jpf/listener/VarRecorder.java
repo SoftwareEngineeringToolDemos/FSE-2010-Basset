@@ -1,42 +1,42 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.listener;
 
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.ListenerAdapter;
-import gov.nasa.jpf.jvm.bytecode.JVMArrayElementInstruction;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.FieldInfo;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.MethodInfo;
+import gov.nasa.jpf.jvm.StackFrame;
+import gov.nasa.jpf.jvm.Step;
+import gov.nasa.jpf.jvm.ThreadInfo;
+import gov.nasa.jpf.jvm.Types;
+import gov.nasa.jpf.jvm.bytecode.ArrayInstruction;
 import gov.nasa.jpf.jvm.bytecode.ArrayLoadInstruction;
-import gov.nasa.jpf.jvm.bytecode.JVMFieldInstruction;
-import gov.nasa.jpf.jvm.bytecode.JVMLocalVariableInstruction;
-import gov.nasa.jpf.vm.bytecode.StoreInstruction;
-import gov.nasa.jpf.vm.bytecode.LocalVariableInstruction;
+import gov.nasa.jpf.jvm.bytecode.FieldInstruction;
+import gov.nasa.jpf.jvm.bytecode.Instruction;
+import gov.nasa.jpf.jvm.bytecode.LocalVariableInstruction;
+import gov.nasa.jpf.jvm.bytecode.StoreInstruction;
+import gov.nasa.jpf.jvm.bytecode.VariableAccessor;
 import gov.nasa.jpf.util.StringSetMatcher;
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.FieldInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.MJIEnv;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.MethodInfo;
-import gov.nasa.jpf.vm.StackFrame;
-import gov.nasa.jpf.vm.Step;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.Types;
 
 import java.util.HashMap;
 
@@ -66,61 +66,64 @@ public class VarRecorder extends ListenerAdapter {
     recordArrays = config.getBoolean("var_recorder.arrays", true);
   }
 
-  @Override
-  public void executeInstruction(VM vm, ThreadInfo ti, Instruction insnToExecute) {
+  public void executeInstruction(JVM jvm) {
+    Instruction inst;
     String name, value;
     byte type;
 
-    if (!canRecord(vm, insnToExecute))
+    if (!canRecord(jvm))
       return;
 
-    if (!(insnToExecute instanceof StoreInstruction))
-      if (!(insnToExecute instanceof ArrayLoadInstruction))
+    inst = jvm.getLastInstruction();
+    if (!(inst instanceof StoreInstruction))
+      if (!(inst instanceof ArrayLoadInstruction))
         return;
 
-    type = getType(ti, insnToExecute);
-    name = getName(ti, insnToExecute, type);
+    type = getType(jvm);
+    name = getName(jvm, type);
 
-    if (insnToExecute instanceof ArrayLoadInstruction) {
-      setComment(vm, ti, name, "", "", true);
-      saveVariableType(ti, type);
+    if (inst instanceof ArrayLoadInstruction) {
+      setComment(jvm, name, "", "", true);
+      saveVariableType(jvm, type);
     } else {
-      value = getValue(ti, insnToExecute, type);
-      setComment(vm, ti, name, " <- ", value, true);
+      value = getValue(jvm, type);
+      setComment(jvm, name, " <- ", value, true);
     }
   }
 
-  @Override
-  public void instructionExecuted(VM vm, ThreadInfo ti, Instruction nextInsn, Instruction executedInsn) {
+  public void instructionExecuted(JVM jvm) {
+    Instruction inst;
     String name, value;
     byte type;
 
-    if (!canRecord(vm, executedInsn))
+    if (!canRecord(jvm))
       return;
 
-    if (executedInsn instanceof StoreInstruction) {
-      name = pendingComment.remove(ti);
-      setComment(vm, ti, name, "", "", false);
+    inst = jvm.getLastInstruction();
+    if (inst instanceof StoreInstruction) {
+      name = pendingComment.remove(jvm.getLastThreadInfo());
+      setComment(jvm, name, "", "", false);
       return;
     }
 
-    type  = getType(ti, executedInsn);
-    value = getValue(ti, executedInsn, type);
+    type  = getType(jvm);
+    value = getValue(jvm, type);
 
-    if (executedInsn instanceof ArrayLoadInstruction)
-      name = pendingComment.remove(ti);
+    if (inst instanceof ArrayLoadInstruction)
+      name = pendingComment.remove(jvm.getLastThreadInfo());
     else
-      name = getName(ti, executedInsn, type);
+      name = getName(jvm, type);
 
-    if (isArrayReference(vm, ti))
-      saveVariableName(ti, name);
+    if (isArrayReference(jvm))
+      saveVariableName(jvm, name);
     else
-      saveVariableType(ti, type);
+      saveVariableType(jvm, type);
 
-    setComment(vm, ti, name, " -> ", value, false);
+    setComment(jvm, name, " -> ", value, false);
   }
 
-  private final void setComment(VM vm, ThreadInfo ti, String name, String operator, String value, boolean pending) {
+  private final void setComment(JVM jvm, String name, String operator, String value, boolean pending) {
+    ThreadInfo ti;
     Step step;
     String comment;
 
@@ -133,22 +136,26 @@ public class VarRecorder extends ListenerAdapter {
     comment = name + operator + value;
 
     if (pending) {
+      ti = jvm.getLastThreadInfo();
       pendingComment.put(ti, comment);
     } else {
-      step = vm.getLastStep();
+      step = jvm.getLastStep();
       step.setComment(name + operator + value);
     }
   }
 
-  private final boolean canRecord(VM vm, Instruction inst) {
+  private final boolean canRecord(JVM jvm) {
     ClassInfo ci;
     MethodInfo mi;
+    Instruction inst;
 
-    if (vm.getLastStep() == null)
+    if (jvm.getLastStep() == null)
       return(false);
 
-    if (!(inst instanceof LocalVariableInstruction))
-      if (!(inst instanceof JVMArrayElementInstruction))
+    inst = jvm.getLastInstruction();
+
+    if (!(inst instanceof VariableAccessor))
+      if (!(inst instanceof ArrayInstruction))
         return(false);
 
     mi   = inst.getMethodInfo();
@@ -169,71 +176,80 @@ public class VarRecorder extends ListenerAdapter {
 
   // <2do> general purpose listeners should not use anonymous attribute types such as String
   
-  private final void saveVariableName(ThreadInfo ti, String name) {
-    StackFrame frame = ti.getModifiableTopFrame();
-    frame.addOperandAttr(name);
+  private final void saveVariableName(JVM jvm, String name) {
+    ThreadInfo ti;
+
+    ti = jvm.getLastThreadInfo();
+    ti.addOperandAttr(name);
   }
 
-  private final void saveVariableType(ThreadInfo ti, byte type) {
+  private final void saveVariableType(JVM jvm, byte type) {
+    ThreadInfo ti;
     StackFrame frame;
     String str;
 
-    frame = ti.getModifiableTopFrame();
-    if (frame.getTopPos() < 0) {
+    ti = jvm.getLastThreadInfo();
+    frame = ti.getTopFrame();
+    if (frame.getTopPos() < 0)
       return;
-    }
 
     str = encodeType(type);
     frame.addOperandAttr(str);
   }
 
-  private final boolean isArrayReference(VM vm, ThreadInfo ti) {
-    StackFrame frame = ti.getTopFrame();
+  private final boolean isArrayReference(JVM jvm) {
+    ThreadInfo ti;
+    StackFrame frame;
+    ElementInfo ei;
+    int objRef;
 
-    if (frame.getTopPos() < 0) {
-      return(false);
-    }
+    ti    = jvm.getLastThreadInfo();
+    frame = ti.getTopFrame();
 
-    if (!frame.isOperandRef()) {
+    if (frame.getTopPos() < 0)
       return(false);
-    }
 
-    int objRef = frame.peek();
-    if (objRef == MJIEnv.NULL) {
+    if (!frame.isOperandRef())
       return(false);
-    }
 
-    ElementInfo ei = ti.getElementInfo(objRef);
-    if (ei == null) {
+    objRef = frame.peek();
+    if (objRef == -1)
       return(false);
-    }
+
+    ei = jvm.getHeap().get(objRef);
+    if (ei == null)
+      return(false);
 
     return(ei.isArray());
   }
 
-  private byte getType(ThreadInfo ti, Instruction inst) {
+  private byte getType(JVM jvm) {
+    ThreadInfo ti;
     StackFrame frame;
     FieldInfo fi;
+    Instruction inst;
     String type;
 
+    ti = jvm.getLastThreadInfo();
     frame = ti.getTopFrame();
     if ((frame.getTopPos() >= 0) && (frame.isOperandRef())) {
       return (Types.T_REFERENCE);
     }
 
     type = null;
+    inst = jvm.getLastInstruction();
 
-    if (((recordLocals) && (inst instanceof JVMLocalVariableInstruction))
-            || ((recordFields) && (inst instanceof JVMFieldInstruction))) {
-      if (inst instanceof JVMLocalVariableInstruction) {
-        type = ((JVMLocalVariableInstruction) inst).getLocalVariableType();
+    if (((recordLocals) && (inst instanceof LocalVariableInstruction))
+            || ((recordFields) && (inst instanceof FieldInstruction))) {
+      if (inst instanceof LocalVariableInstruction) {
+        type = ((LocalVariableInstruction) inst).getLocalVariableType();
       } else {
-        fi = ((JVMFieldInstruction) inst).getFieldInfo();
+        fi = ((FieldInstruction) inst).getFieldInfo();
         type = fi.getType();
       }
     }
 
-    if ((recordArrays) && (inst instanceof JVMArrayElementInstruction)) {
+    if ((recordArrays) && (inst instanceof ArrayInstruction)) {
       return (getTypeFromInstruction(inst));
     }
 
@@ -245,13 +261,13 @@ public class VarRecorder extends ListenerAdapter {
   }
 
   private final static byte getTypeFromInstruction(Instruction inst) {
-    if (inst instanceof JVMArrayElementInstruction)
-      return(getTypeFromInstruction((JVMArrayElementInstruction) inst));
+    if (inst instanceof ArrayInstruction)
+      return(getTypeFromInstruction((ArrayInstruction) inst));
 
     return(Types.T_VOID);
   }
 
-  private final static byte getTypeFromInstruction(JVMArrayElementInstruction inst) {
+  private final static byte getTypeFromInstruction(ArrayInstruction inst) {
     String name;
 
     name = inst.getClass().getName();
@@ -297,37 +313,44 @@ public class VarRecorder extends ListenerAdapter {
     }
   }
 
-  private String getName(ThreadInfo ti, Instruction inst, byte type) {
+  private String getName(JVM jvm, byte type) {
+    Instruction inst;
     String name;
     int index;
     boolean store;
 
-    if (((recordLocals) && (inst instanceof JVMLocalVariableInstruction)) ||
-        ((recordFields) && (inst instanceof JVMFieldInstruction))) {
-      name = ((LocalVariableInstruction) inst).getVariableId();
+    inst = jvm.getLastInstruction();
+
+    if (((recordLocals) && (inst instanceof LocalVariableInstruction)) ||
+        ((recordFields) && (inst instanceof FieldInstruction))) {
+      name = ((VariableAccessor) inst).getVariableId();
       name = name.substring(name.lastIndexOf('.') + 1);
 
       return(name);
     }
 
-    if ((recordArrays) && (inst instanceof JVMArrayElementInstruction)) {
+    if ((recordArrays) && (inst instanceof ArrayInstruction)) {
       store  = inst instanceof StoreInstruction;
-      name   = getArrayName(ti, type, store);
-      index  = getArrayIndex(ti, type, store);
+      name   = getArrayName(jvm, type, store);
+      index  = getArrayIndex(jvm, type, store);
       return(name + '[' + index + ']');
     }
 
     return(null);
   }
 
-  private String getValue(ThreadInfo ti, Instruction inst, byte type) {
+  private String getValue(JVM jvm, byte type) {
+    ThreadInfo ti;
     StackFrame frame;
+    Instruction inst;
     int lo, hi;
 
+    ti    = jvm.getLastThreadInfo();
     frame = ti.getTopFrame();
+    inst  = jvm.getLastInstruction();
 
-    if (((recordLocals) && (inst instanceof JVMLocalVariableInstruction)) ||
-        ((recordFields) && (inst instanceof JVMFieldInstruction)))
+    if (((recordLocals) && (inst instanceof LocalVariableInstruction)) ||
+        ((recordFields) && (inst instanceof FieldInstruction)))
     {
        if (frame.getTopPos() < 0)
          return(null);
@@ -338,34 +361,36 @@ public class VarRecorder extends ListenerAdapter {
        return(decodeValue(type, lo, hi));
     }
 
-    if ((recordArrays) && (inst instanceof JVMArrayElementInstruction))
-      return(getArrayValue(ti, type));
+    if ((recordArrays) && (inst instanceof ArrayInstruction))
+      return(getArrayValue(jvm, type));
 
     return(null);
   }
 
-  private String getArrayName(ThreadInfo ti, byte type, boolean store) {
+  private String getArrayName(JVM jvm, byte type, boolean store) {
+    ThreadInfo ti;
     String attr;
     int offset;
 
+    ti     = jvm.getLastThreadInfo();
     offset = calcOffset(type, store) + 1;
     // <2do> String is really not a good attribute type to retrieve!
-    StackFrame frame = ti.getTopFrame();
-    attr   = frame.getOperandAttr( offset, String.class); 
+    attr   = ti.getOperandAttr(offset, String.class); 
 
-    if (attr != null) {
+    if (attr != null)
       return(attr);
-    }
 
     return("?");
   }
 
-  private int getArrayIndex(ThreadInfo ti, byte type, boolean store) {
+  private int getArrayIndex(JVM jvm, byte type, boolean store) {
+    ThreadInfo ti;
     int offset;
 
+    ti     = jvm.getLastThreadInfo();
     offset = calcOffset(type, store);
 
-    return(ti.getTopFrame().peek(offset));
+    return(ti.peek(offset));
   }
 
   private final static int calcOffset(byte type, boolean store) {
@@ -375,10 +400,12 @@ public class VarRecorder extends ListenerAdapter {
     return(Types.getTypeSize(type));
   }
 
-  private String getArrayValue(ThreadInfo ti, byte type) {
+  private String getArrayValue(JVM jvm, byte type) {
+    ThreadInfo ti;
     StackFrame frame;
     int lo, hi;
 
+    ti    = jvm.getLastThreadInfo();
     frame = ti.getTopFrame();
     lo    = frame.peek();
     hi    = frame.getTopPos() >= 1 ? frame.peek(1) : 0;
@@ -401,7 +428,7 @@ public class VarRecorder extends ListenerAdapter {
       case Types.T_SHORT:   return(String.valueOf(lo));
 
       case Types.T_REFERENCE:
-        ElementInfo ei = VM.getVM().getHeap().get(lo);
+        ElementInfo ei = JVM.getVM().getHeap().get(lo);
         if (ei == null)
           return(null);
 

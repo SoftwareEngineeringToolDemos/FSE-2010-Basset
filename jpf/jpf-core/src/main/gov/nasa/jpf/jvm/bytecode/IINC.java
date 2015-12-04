@@ -1,78 +1,66 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.jvm.bytecode;
 
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.StackFrame;
-import gov.nasa.jpf.vm.ThreadInfo;
+import gov.nasa.jpf.jvm.KernelState;
+import gov.nasa.jpf.jvm.SystemState;
+import gov.nasa.jpf.jvm.ThreadInfo;
 
 
 /**
  * Increment local variable by constant
  * No change
  */
-public class IINC extends Instruction implements JVMInstruction {
+public class IINC extends Instruction {
 
-  protected int index;
-  protected int increment;
+	protected int index;
+	protected int increment;
 
-  public IINC(int localVarIndex, int increment) {
-    this.index = localVarIndex;
-    this.increment = increment;
-  }
+	public IINC(int localVarIndex, int increment){
+		this.index = localVarIndex;
+		this.increment = increment;
+	}
 
-  @Override
-  public Instruction execute(ThreadInfo ti) {
-    StackFrame frame = ti.getModifiableTopFrame();
+	public Instruction execute (SystemState ss, KernelState ks, ThreadInfo th) {
+		th.setLocalVariable(index, th.getLocalVariable(index) + increment, false);
 
-    int v = frame.getLocalVariable(index);
-    v += increment;
+		return getNext(th);
+	}
 
-    frame.setLocalVariable(index, v, false);
+	public int getLength() {
+		return 3; // opcode, index, const
+	}
 
-    return getNext(ti);
-  }
+	public int getByteCode () {
+		return 0x84; // ?? wide
+	}
 
-  @Override
-  public int getLength() {
-    return 3; // opcode, index, const
-  }
+	public void accept(InstructionVisitor insVisitor) {
+		insVisitor.visit(this);
+	}
 
-  @Override
-  public int getByteCode() {
-    return 0x84; // ?? wide
-  }
+	public int getIndex() {
+		return index;
+	}
 
-  @Override
-  public void accept(JVMInstructionVisitor insVisitor) {
-    insVisitor.visit(this);
-  }
+	public int getIncrement() {
+		return increment;
+	}
 
-  public int getIndex() {
-    return index;
-  }
-
-  public int getIncrement() {
-    return increment;
-  }
-
-  @Override
-  public String toPostExecString() {
-    return "iinc " + index + ' ' + increment;
-  }
 }

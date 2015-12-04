@@ -1,34 +1,34 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2010 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 
 package gov.nasa.jpf.test.mc.basic;
 
 import gov.nasa.jpf.ListenerAdapter;
+import gov.nasa.jpf.jvm.ChoiceGenerator;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.SystemState;
+import gov.nasa.jpf.jvm.ThreadInfo;
+import gov.nasa.jpf.jvm.Verify;
 import gov.nasa.jpf.jvm.bytecode.EXECUTENATIVE;
+import gov.nasa.jpf.jvm.bytecode.Instruction;
+import gov.nasa.jpf.jvm.choice.IntChoiceFromList;
 import gov.nasa.jpf.util.test.TestJPF;
-import gov.nasa.jpf.vm.ChoiceGenerator;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.SyncPolicy;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.SystemState;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.Verify;
-import gov.nasa.jpf.vm.choice.IntChoiceFromList;
 
 import java.util.ArrayList;
 
@@ -43,42 +43,43 @@ public class CGNotificationTest extends TestJPF {
 
     static ArrayList<String> sequence;
 
-    @Override
-    public void choiceGeneratorRegistered(VM vm, ChoiceGenerator<?> nextCG, ThreadInfo ti, Instruction executedInsn) {
-      System.out.println("# CG registered: " + nextCG);
-      sequence.add("registered " + nextCG.getId());
+    public void choiceGeneratorRegistered(JVM vm) {
+      ChoiceGenerator<?> cg = vm.getLastChoiceGenerator();
+      System.out.println("# CG registered: " + cg);
+      sequence.add("registered " + cg.getId());
 
-      assert nextCG.hasMoreChoices();
+      assert cg.hasMoreChoices();
     }
 
-    @Override
-    public void choiceGeneratorSet(VM vm, ChoiceGenerator<?> newCG) {
-      System.out.println("# CG set:        " + newCG);
-      sequence.add("set " + newCG.getId());
+    public void choiceGeneratorSet(JVM vm) {
+      ChoiceGenerator<?> cg = vm.getLastChoiceGenerator();
+      System.out.println("# CG set:        " + cg);
+      sequence.add("set " + cg.getId());
 
-      assert newCG.hasMoreChoices();
+      assert cg.hasMoreChoices();
     }
 
-    @Override
-    public void choiceGeneratorAdvanced(VM vm, ChoiceGenerator<?> currentCG) {
-      System.out.println("#   CG advanced: " + currentCG);
-      sequence.add("advance " + currentCG.getId() + ' ' + currentCG.getNextChoice());
+    public void choiceGeneratorAdvanced(JVM vm) {
+      ChoiceGenerator<?> cg = vm.getLastChoiceGenerator();
+      System.out.println("#   CG advanced: " + cg);
+      sequence.add("advance " + cg.getId() + ' ' + cg.getNextChoice());
     }
 
-    @Override
-    public void choiceGeneratorProcessed(VM vm, ChoiceGenerator<?> processedCG) {
-      System.out.println("# CG processed:  " + processedCG);
-      sequence.add("processed " + processedCG.getId());
+    public void choiceGeneratorProcessed(JVM vm) {
+      ChoiceGenerator<?> cg = vm.getLastChoiceGenerator();
+      System.out.println("# CG processed:  " + cg);
+      sequence.add("processed " + cg.getId());
 
-      assert !processedCG.hasMoreChoices();
+      assert !cg.hasMoreChoices();
     }
 
-    @Override
-    public void instructionExecuted(VM vm, ThreadInfo ti, Instruction nextInsn, Instruction lastInsn){
+    public void instructionExecuted(JVM vm){
+      Instruction insn = vm.getLastInstruction();
+      ThreadInfo ti = vm.getLastThreadInfo();
       SystemState ss = vm.getSystemState();
 
-      if (lastInsn instanceof EXECUTENATIVE) { // break on native method exec
-        EXECUTENATIVE exec = (EXECUTENATIVE) lastInsn;
+      if (insn instanceof EXECUTENATIVE) { // break on native method exec
+        EXECUTENATIVE exec = (EXECUTENATIVE) insn;
 
         if (exec.getExecutedMethodName().equals("getInt")){// this insn did create a CG
           if (!ti.isFirstStepInsn()){
@@ -113,9 +114,9 @@ public class CGNotificationTest extends TestJPF {
 
     if (!isJPFRun()){
       String[] expected = {
-        "registered " + SyncPolicy.ROOT,
-        "set " + SyncPolicy.ROOT,
-        "advance " + SyncPolicy.ROOT + " ThreadInfo [name=main,id=0,state=RUNNING]",
+        "registered <root>",
+        "set <root>",
+        "advance <root> ThreadInfo [name=main,id=0,state=RUNNING]",
         "registered verifyGetBoolean",
         "set verifyGetBoolean",
         "advance verifyGetBoolean false",
@@ -147,7 +148,7 @@ public class CGNotificationTest extends TestJPF {
         "processed listenerCG",
         "processed verifyGetInt(II)",
         "processed verifyGetBoolean",
-        "processed " + SyncPolicy.ROOT
+        "processed <root>"
       };
 
       assert Sequencer.sequence.size() == expected.length;

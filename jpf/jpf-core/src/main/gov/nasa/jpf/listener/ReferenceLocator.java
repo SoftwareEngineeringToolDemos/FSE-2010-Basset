@@ -1,31 +1,32 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2011 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.listener;
 
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.ListenerAdapter;
-import gov.nasa.jpf.jvm.bytecode.JVMInstanceFieldInstruction;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.StackFrame;
+import gov.nasa.jpf.jvm.ThreadInfo;
+import gov.nasa.jpf.jvm.bytecode.InstanceFieldInstruction;
 import gov.nasa.jpf.jvm.bytecode.InstanceInvocation;
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.StackFrame;
-import gov.nasa.jpf.vm.ThreadInfo;
+import gov.nasa.jpf.jvm.bytecode.Instruction;
 
 import java.io.PrintWriter;
 import java.util.Arrays;
@@ -68,17 +69,18 @@ public class ReferenceLocator extends ListenerAdapter {
     pw.println();
   }
   
-  @Override
-  public void objectCreated (VM vm, ThreadInfo ti, ElementInfo ei){
+  public void objectCreated (JVM vm){
+    ElementInfo ei = vm.getLastElementInfo();
     int ref = ei.getObjectRef();
     
-    if (createRefs != null && Arrays.binarySearch(createRefs, ref) >= 0){    
+    if (createRefs != null && Arrays.binarySearch(createRefs, ref) >= 0){
+      ThreadInfo ti = vm.getLastThreadInfo();      
       printLocation("[ReferenceLocator] object " + ei + " created at:", ti);
     } 
   }
   
-  @Override
-  public void objectReleased (VM vm, ThreadInfo ti, ElementInfo ei){
+  public void objectReleased (JVM vm){
+    ElementInfo ei = vm.getLastElementInfo();
     int ref = ei.getObjectRef();
     
     if (releaseRefs != null && Arrays.binarySearch(releaseRefs, ref) >= 0){
@@ -86,17 +88,18 @@ public class ReferenceLocator extends ListenerAdapter {
     }
   }
   
-  @Override
-  public void instructionExecuted (VM vm, ThreadInfo ti, Instruction nextInsn, Instruction executedInsn){
+  public void instructionExecuted (JVM vm){
+    Instruction insn = vm.getLastInstruction();
+    ThreadInfo ti = vm.getLastThreadInfo();
     
     if (useRefs != null){
-      if (executedInsn instanceof InstanceInvocation) {
-        int ref = ((InstanceInvocation)executedInsn).getCalleeThis(ti);
+      if (insn instanceof InstanceInvocation) {
+        int ref = ((InstanceInvocation)insn).getCalleeThis(ti);
         if (Arrays.binarySearch(useRefs, ref) >= 0){
           printLocation("[ReferenceLocator] call on object " + ti.getElementInfo(ref) + " at:", ti);
         }
-      } else if (executedInsn instanceof JVMInstanceFieldInstruction){
-        int ref = ((JVMInstanceFieldInstruction)executedInsn).getLastThis();
+      } else if (insn instanceof InstanceFieldInstruction){
+        int ref = ((InstanceFieldInstruction)insn).getLastThis();
         if (Arrays.binarySearch(useRefs, ref) >= 0){
           printLocation("[ReferenceLocator] field access of " + ti.getElementInfo(ref) + " at:", ti);          
         }

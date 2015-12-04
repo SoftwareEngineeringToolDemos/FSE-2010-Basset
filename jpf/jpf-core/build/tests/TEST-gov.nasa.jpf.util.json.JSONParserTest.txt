@@ -1,9 +1,0 @@
-Testsuite: gov.nasa.jpf.util.json.JSONParserTest
-Tests run: 6, Failures: 0, Errors: 0, Time elapsed: 0.034 sec
-
-Testcase: testArrayParse took 0.015 sec
-Testcase: testEmptyArray took 0 sec
-Testcase: testCGCallParsing took 0.002 sec
-Testcase: testOneLevelJSON took 0 sec
-Testcase: testEmptyObject took 0 sec
-Testcase: testIdentifacatorsParsing took 0 sec

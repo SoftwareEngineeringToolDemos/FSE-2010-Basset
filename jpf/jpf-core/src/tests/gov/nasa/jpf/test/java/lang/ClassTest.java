@@ -1,20 +1,21 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 /**
  * This is a raw test class, which produces AssertionErrors for all
  * cases we want to catch. Make double-sure we don't refer to any
@@ -36,7 +37,6 @@
 package gov.nasa.jpf.test.java.lang;
 
 import gov.nasa.jpf.util.test.TestJPF;
-import gov.nasa.jpf.vm.Verify;
 
 import java.io.Serializable;
 import java.lang.annotation.Inherited;
@@ -75,7 +75,7 @@ public class ClassTest extends TestJPF implements Cloneable, Serializable {
       }
     }
   }
-  
+
   @Test
   public void testClassForNameException () throws ClassNotFoundException {
     if (verifyUnhandledException("java.lang.ClassNotFoundException")) {
@@ -83,31 +83,6 @@ public class ClassTest extends TestJPF implements Cloneable, Serializable {
     }
   }
 
-  
-  static class X {
-    static {
-      System.out.println("ClassTest$X initialized");
-      Verify.incrementCounter(0);
-    }
-  }
-  
-  @Test 
-  public void testClassForNameInit () throws ClassNotFoundException {
-    if (!isJPFRun()){
-      Verify.resetCounter(0);
-    }
-    
-    if (verifyNoPropertyViolation()) {
-      Class<?> cls = Class.forName( "gov.nasa.jpf.test.java.lang.ClassTest$X", true,  this.getClass().getClassLoader());
-      System.out.println("Class.forName() returned");
-    }
-    
-    if (!isJPFRun()){
-      assertTrue( Verify.getCounter(0) == 1);
-    }
-  }
-  
-  
   @Test 
   public void testGetClass () {
     if (verifyNoPropertyViolation()) {
@@ -289,8 +264,7 @@ public class ClassTest extends TestJPF implements Cloneable, Serializable {
     }
     public TestClass() {}
     public TestClass (int a) {a = 0;}
-    @Override
-	public void foo() {}               // 1
+    public void foo() {}               // 1
     void bar() {}                      // 2
     public static void baz () {}       // 3
     
@@ -570,16 +544,5 @@ public class ClassTest extends TestJPF implements Cloneable, Serializable {
       assertTrue( Child2.class.isAnnotationPresent(A9.class));
     }    
   }
-
-  @Test
-  public void getResourceTest() {
-    if (verifyNoPropertyViolation()){
-      Class c = ClassLoader.class;
-      assertNotNull(c.getResource("Class.class"));
-      assertNotNull(c.getResource("/java/lang/Class.class"));
-      assertNull(c.getResource("java/lang/Class.class"));
-      assertEquals(c.getResource("Class.class"),c.getResource("/java/lang/Class.class"));
-      assertNull(c.getResource("not_existing_resources"));
-    }
-  }  
+  
 }

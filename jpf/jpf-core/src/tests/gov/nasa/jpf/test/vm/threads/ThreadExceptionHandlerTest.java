@@ -1,20 +1,21 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2011 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.test.vm.threads;
 
 import gov.nasa.jpf.util.test.TestJPF;
@@ -32,14 +33,8 @@ public class ThreadExceptionHandlerTest extends TestJPF {
 
   class NPEHandler implements Thread.UncaughtExceptionHandler {
 
-    @Override
-	public void uncaughtException(Thread t, Throwable e) {
-      /**
-      System.out.println("--- in NPEHandler.uncaughtException");
-      System.out.print("   "); System.out.println(t);
-      System.out.print("   "); System.out.println(e);
+    public void uncaughtException(Thread t, Throwable e) {
       assertTrue(e instanceof NullPointerException);
-      **/
       n = 1;
     }
   }
@@ -54,8 +49,7 @@ public class ThreadExceptionHandlerTest extends TestJPF {
       super(parent, name);
     }
 
-    @Override
-	public void uncaughtException(Thread t, Throwable e) {
+    public void uncaughtException(Thread t, Throwable e) {
       assertTrue(e instanceof NullPointerException);
       n = 2;
     }
@@ -67,8 +61,7 @@ public class ThreadExceptionHandlerTest extends TestJPF {
       super(name);
     }
 
-    @Override
-	public void uncaughtException(Thread t, Throwable e) {
+    public void uncaughtException(Thread t, Throwable e) {
       assertTrue(e instanceof NullPointerException);
       n = 3;
     }
@@ -84,24 +77,21 @@ public class ThreadExceptionHandlerTest extends TestJPF {
 
   class NPEHandlerExc implements Thread.UncaughtExceptionHandler {
 
-    @Override
-	public void uncaughtException(Thread t, Throwable e) {
+    public void uncaughtException(Thread t, Throwable e) {
       throw new NullPointerException("test");
     }
   }
   
   class TestRunnable implements Runnable {
 
-    @Override
-	public void run() {
+    public void run() {
       throw new NullPointerException();
     }
   }
 
   class TestRunnable2 implements Runnable {
 
-    @Override
-	public void run() {
+    public void run() {
     }
   }
 
@@ -112,7 +102,7 @@ public class ThreadExceptionHandlerTest extends TestJPF {
       Thread ct = Thread.currentThread();
       assertEquals(ct.getUncaughtExceptionHandler(),
               ct.getThreadGroup());
-      assertNull(Thread.getDefaultUncaughtExceptionHandler());
+      assertNull(ct.getDefaultUncaughtExceptionHandler());
     }
   }
 
@@ -143,7 +133,7 @@ public class ThreadExceptionHandlerTest extends TestJPF {
                                   "+vm.pass_uncaught_handler")){
       n = 0;
       Thread w = new Thread(new TestRunnable());
-      Thread.setDefaultUncaughtExceptionHandler(new NPEHandler());
+      w.setDefaultUncaughtExceptionHandler(new NPEHandler());
       w.start();
       try {
         w.join();
@@ -162,10 +152,10 @@ public class ThreadExceptionHandlerTest extends TestJPF {
     if (verifyNoPropertyViolation()){
       Thread w = new Thread(new TestRunnable2());
       w.setUncaughtExceptionHandler(new NPEHandler());
-      Thread.setDefaultUncaughtExceptionHandler(new NPEHandler());
+      w.setDefaultUncaughtExceptionHandler(new NPEHandler());
       assertNotNull(w.getUncaughtExceptionHandler());
       assertNotNull(w.getThreadGroup());
-      assertNotNull(Thread.getDefaultUncaughtExceptionHandler());
+      assertNotNull(w.getDefaultUncaughtExceptionHandler());
       w.start();
       try {
         w.join();
@@ -173,7 +163,7 @@ public class ThreadExceptionHandlerTest extends TestJPF {
       }
       assertNull(w.getUncaughtExceptionHandler());
       assertNull(w.getThreadGroup());
-      assertNotNull(Thread.getDefaultUncaughtExceptionHandler());
+      assertNotNull(w.getDefaultUncaughtExceptionHandler());
     }
   }
 
@@ -204,7 +194,7 @@ public class ThreadExceptionHandlerTest extends TestJPF {
                                   "+vm.pass_uncaught_handler")){
       n = 0;
       Thread w = new Thread(new NPEHandler2("test"), new TestRunnable()); // n = 2
-      Thread.setDefaultUncaughtExceptionHandler(new NPEHandler()); // n = 1
+      w.setDefaultUncaughtExceptionHandler(new NPEHandler()); // n = 1
       w.start();
       try {
         w.join();
@@ -225,7 +215,7 @@ public class ThreadExceptionHandlerTest extends TestJPF {
       Thread w =
               new Thread(new NPEHandler4(new NPEHandler3("parent"), "child"),
               new TestRunnable());
-      Thread.setDefaultUncaughtExceptionHandler(new NPEHandler());
+      w.setDefaultUncaughtExceptionHandler(new NPEHandler());
       w.start();
       try {
         w.join();
@@ -243,7 +233,7 @@ public class ThreadExceptionHandlerTest extends TestJPF {
 				 "+vm.ignore_uncaught_handler=false",
                                  "+vm.pass_uncaught_handler")){
       Thread w = new Thread(new TestRunnable());
-      Thread.setDefaultUncaughtExceptionHandler(new NPEHandlerExc());
+      w.setDefaultUncaughtExceptionHandler(new NPEHandlerExc());
       w.start();
       try {
         w.join();

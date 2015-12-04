@@ -1,38 +1,37 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.jvm.bytecode;
 
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.ClassLoaderInfo;
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.Heap;
-import gov.nasa.jpf.vm.LoadOnJPFRequired;
-import gov.nasa.jpf.vm.StackFrame;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.Types;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.Heap;
+import gov.nasa.jpf.jvm.KernelState;
+import gov.nasa.jpf.jvm.SystemState;
+import gov.nasa.jpf.jvm.ThreadInfo;
+import gov.nasa.jpf.jvm.Types;
 
 
 /**
  * Create new multidimensional array
  * ..., count1, [count2, ...] => ..., arrayref
  */
-public class MULTIANEWARRAY extends Instruction implements JVMInstruction {
+public class MULTIANEWARRAY extends Instruction {
   protected String type;
   
   protected int dimensions;
@@ -44,41 +43,29 @@ public class MULTIANEWARRAY extends Instruction implements JVMInstruction {
   }
 
   public static int allocateArray (Heap heap, String type, int[] dim, ThreadInfo ti, int d) {
-    int l = dim[d];
-    ElementInfo eiArray = heap.newArray(type.substring(d + 1), l, ti);
+    int         l = dim[d];
+    int         arrayRef = heap.newArray(type.substring(d + 1), l, ti);
+    ElementInfo e = heap.get(arrayRef);
 
     if (dim.length > (d + 1)) {
       for (int i = 0; i < l; i++) {
-        eiArray.setReferenceElement(i, allocateArray(heap, type, dim, ti, d + 1));
+        e.setReferenceElement(i, allocateArray(heap, type, dim, ti, d + 1));
       }
     }
 
-    return eiArray.getObjectRef();
+    return arrayRef;
   }
 
-  @Override
-  public Instruction execute (ThreadInfo ti) {
-    String compType = Types.getComponentTerminal(type);
-
-    // resolve the component class first
-    if(Types.isReferenceSignature(type)) {
-      try {
-        ti.resolveReferencedClass(compType);
-      } catch(LoadOnJPFRequired lre) {
-        return ti.getPC();
-      }
-    }
-
+  public Instruction execute (SystemState ss, KernelState ks, ThreadInfo ti) {
     arrayLengths = new int[dimensions];
-    StackFrame frame = ti.getModifiableTopFrame();
 
     for (int i = dimensions - 1; i >= 0; i--) {
-      arrayLengths[i] = frame.pop();
+      arrayLengths[i] = ti.pop();
     }
 
     // there is no clinit for array classes, but we still have  to create a class object
     // since its a builtin class, we also don't have to bother with NoClassDefFoundErrors
-    ClassInfo ci = ClassLoaderInfo.getCurrentResolvedClassInfo(type);
+    ClassInfo ci = ClassInfo.getResolvedClassInfo(type);
     if (!ci.isRegistered()) {
       ci.registerClass(ti);
       ci.setInitialized();
@@ -87,23 +74,20 @@ public class MULTIANEWARRAY extends Instruction implements JVMInstruction {
     int arrayRef = allocateArray(ti.getHeap(), type, arrayLengths, ti, 0);
 
     // put the result (the array reference) on the stack
-    frame.pushRef(arrayRef);
+    ti.push(arrayRef, true);
 
     return getNext(ti);
   }
 
-  @Override
   public int getLength() {
     return 4; // opcode, index1, index2, dimensions
   }
   
-  @Override
   public int getByteCode () {
     return 0xC5;
   }
   
-  @Override
-  public void accept(JVMInstructionVisitor insVisitor) {
+  public void accept(InstructionVisitor insVisitor) {
 	  insVisitor.visit(this);
   }
 

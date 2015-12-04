@@ -1,30 +1,32 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.report;
 
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.Error;
 import gov.nasa.jpf.JPF;
 import gov.nasa.jpf.JPFListener;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.Path;
 import gov.nasa.jpf.search.Search;
 import gov.nasa.jpf.search.SearchListenerAdapter;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.Path;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,26 +46,23 @@ import java.util.logging.Logger;
 
 public class Reporter extends SearchListenerAdapter {
 
-  public static Logger log = JPF.getLogger("report");
+  public static Logger log = JPF.getLogger("gov.nasa.jpf.report");
 
   protected Config conf;
   protected JPF jpf;
   protected Search search;
-  protected VM vm;
+  protected JVM vm;
 
   protected Date started, finished;
   protected Statistics stat; // the object that collects statistics
   protected List<Publisher> publishers = new ArrayList<Publisher>();
-  
-  protected Thread probeTimer;
-  
+
   public Reporter (Config conf, JPF jpf) {
     this.conf = conf;
     this.jpf = jpf;
     search = jpf.getSearch();
     vm = jpf.getVM();
-    int probeInterval = conf.getInt("report.probe_interval");
-    boolean reportStats = conf.getBoolean("report.statistics", false) || (probeInterval > 0);
+    boolean reportStats = conf.getBoolean("report.statistics", false);
 
     started = new Date();
 
@@ -82,35 +81,8 @@ public class Reporter extends SearchListenerAdapter {
     if (reportStats){
       getRegisteredStatistics();
     }
-    
-    if (probeInterval > 0){
-      probeTimer = createProbeIntervalTimer(probeInterval);
-    }
   }
 
-  protected Thread createProbeIntervalTimer (final int probeInterval){
-    Thread timer = new Thread( new Runnable(){
-        @Override
-		public void run(){
-          log.info("probe timer running");
-          while (!search.isDone()){
-            try {
-              Thread.sleep( probeInterval * 1000);
-              search.probeSearch(); // this is only a request
-            } catch (InterruptedException ix) {
-              // nothing
-            }
-          }
-          log.info("probe timer terminating");
-        }
-     }, "probe-timer");
-    timer.setDaemon(true);
-    
-    // we don't start before the Search is started
-    
-    return timer;
-  }
-  
   /**
    * called after the JPF run is finished. Shouldn't be public, but is called by JPF
    */
@@ -195,11 +167,11 @@ public class Reporter extends SearchListenerAdapter {
     return added;
   }
 
-  public <T extends Publisher> void setPublisherItems (Class<T> publisherCls,
+  public <T extends Publisher> void setPublisherTopics (Class<T> publisherCls,
                                                         int category, String[] topics){
     for (Publisher p : publishers) {
       if (publisherCls.isInstance(p)) {
-        p.setItems(category,topics);
+        p.setTopics(category,topics);
         return;
       }
     }
@@ -251,53 +223,29 @@ public class Reporter extends SearchListenerAdapter {
     }
   }
 
-  protected void publishProbe(){
-    for (Publisher publisher : publishers) {
-      publisher.publishProbe();
-    }    
-  }
-  
   //--- the listener interface that drives report generation
 
-  @Override
   public void searchStarted (Search search){
     publishStart();
-    
-    if (probeTimer != null){
-      probeTimer.start();
-    }
   }
 
-  @Override
   public void stateAdvanced (Search search) {
     publishTransition();
   }
 
-  @Override
   public void searchConstraintHit(Search search) {
     publishConstraintHit();
   }
 
-  @Override
-  public void searchProbed (Search search){
-    publishProbe();
-  }
 
-  @Override
   public void propertyViolated (Search search) {
     publishPropertyViolation();
   }
 
-  @Override
   public void searchFinished (Search search){
     finished = new Date();
 
     publishFinished();
-    
-    if (probeTimer != null){
-      // we could interrupt, but it's a daemon anyways
-      probeTimer = null;
-    }
   }
 
 
@@ -311,7 +259,7 @@ public class Reporter extends SearchListenerAdapter {
     return finished;
   }
     
-  public VM getVM() {
+  public JVM getVM() {
     return vm;
   }
 
@@ -323,16 +271,16 @@ public class Reporter extends SearchListenerAdapter {
     return search.getErrors();
   }
 
-  public Error getCurrentError () {
-    return search.getCurrentError();
+  public Error getLastError () {
+    return search.getLastError();
   }
 
   public String getLastSearchConstraint () {
     return search.getLastSearchConstraint();
   }
 
-  public String getCurrentErrorId () {
-    Error e = getCurrentError();
+  public String getLastErrorId () {
+    Error e = getLastError();
     if (e != null) {
       return "#" + e.getId();
     } else {
@@ -368,7 +316,7 @@ public class Reporter extends SearchListenerAdapter {
   public String getJPFBanner () {
     StringBuilder sb = new StringBuilder();
     
-    sb.append("JavaPathfinder core system v");
+    sb.append("JavaPathfinder v");
     sb.append(JPF.VERSION);
     
     String rev = getRevision();
@@ -378,7 +326,7 @@ public class Reporter extends SearchListenerAdapter {
       sb.append(')');
     }
     
-    sb.append(" - (C) 2005-2014 United States Government. All rights reserved.");
+    sb.append(" - (C) RIACS/NASA Ames Research Center");
     
     if (conf.getBoolean("report.show_repository", false)) {
       String repInfo =  getRepositoryInfo();
@@ -450,7 +398,10 @@ public class Reporter extends SearchListenerAdapter {
   }
 
   public String getSuT() {
-    return vm.getSUTDescription();
+    // it would be better to know from where we loaded the class file, but BCEL doesn't tell us
+    String mainCls = vm.getMainClassName();
+    ClassInfo ciMain = ClassInfo.getResolvedClassInfo(mainCls);
+    return ciMain.getSourceFileName();
   }
   
   public String getJava (){

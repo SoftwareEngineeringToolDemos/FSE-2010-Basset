@@ -8,5 +8,5 @@ JPF_HOME=`dirname "$0"`/..
 if test -z "$JVM_FLAGS"; then
   JVM_FLAGS="-Xmx1024m -ea"
 fi
-
+echo "$JPF_HOME/tools/"
 java $JVM_FLAGS -jar "$JPF_HOME/tools/RunAnt.jar" "$@"

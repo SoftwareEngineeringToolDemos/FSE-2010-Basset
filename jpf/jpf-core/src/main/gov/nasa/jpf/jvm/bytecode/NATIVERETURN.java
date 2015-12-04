@@ -1,73 +1,66 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2010 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 
 package gov.nasa.jpf.jvm.bytecode;
 
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.NativeStackFrame;
-import gov.nasa.jpf.vm.StackFrame;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.Types;
+import gov.nasa.jpf.jvm.KernelState;
+import gov.nasa.jpf.jvm.NativeStackFrame;
+import gov.nasa.jpf.jvm.StackFrame;
+import gov.nasa.jpf.jvm.SystemState;
+import gov.nasa.jpf.jvm.ThreadInfo;
+import gov.nasa.jpf.jvm.Types;
 
 /**
  * synthetic return instruction for native method invocations, so that
  * we don't have to do special provisions to copy the caller args in case
  * a post exec listener wants them.
  */
-public class NATIVERETURN extends JVMReturnInstruction {
+public class NATIVERETURN extends ReturnInstruction {
 
   Object ret;
   Object retAttr;
   Byte retType;
 
-  // this is more simple than a normal JVMReturnInstruction because NativeMethodInfos
+  // this is more simple than a normal ReturnInstruction because NativeMethodInfos
   // are not synchronized, and NativeStackFrames are never the first frame in a thread
   @Override
-  public Instruction execute (ThreadInfo ti) {
+  public Instruction execute (SystemState ss, KernelState ks, ThreadInfo ti) {
     if (!ti.isFirstStepInsn()) {
-      ti.leave();  // takes care of unlocking before potentially creating a CG
+      mi.leave(ti);  // takes care of unlocking before potentially creating a CG
       // NativeMethodInfo is never synchronized, so no thread CG here
     }
 
-    StackFrame frame = ti.getModifiableTopFrame();    
-    getAndSaveReturnValue(frame);
+    storeReturnValue(ti);
 
     // NativeStackFrame can never can be the first stack frame, so no thread CG
 
-    frame = ti.popAndGetModifiableTopFrame();
+    StackFrame top = ti.popFrame();
 
     // remove args, push return value and continue with next insn
-    frame.removeArguments(mi);
-    pushReturnValue(frame);
+    ti.removeArguments(mi);
+    pushReturnValue(ti);
 
     if (retAttr != null) {
       setReturnAttr(ti, retAttr);
     }
 
-    if (mi.isClinit()) {
-      // this is in the clinit RETURN insn for non-MJIs so we have to duplicate here
-      // Duplication could be avoided in DIRECTCALLRETURN, but there is no reliable
-      // way to check if the direct call did return from a clinit since the corresponding
-      // synthetic method could do anything
-      mi.getClassInfo().setInitialized();
-    }
-
-    return frame.getPC().getNext();
+    return top.getPC().getNext();
   }
 
   @Override
@@ -90,14 +83,13 @@ public class NATIVERETURN extends JVMReturnInstruction {
   }
 
   @Override
-  public void accept(JVMInstructionVisitor insVisitor) {
+  public void accept(InstructionVisitor insVisitor) {
 	  insVisitor.visit(this);
   }
 
   @Override
-  protected void getAndSaveReturnValue (StackFrame frame) {
-    // it's got to be a NativeStackFrame since this insn is created by JPF
-    NativeStackFrame nativeFrame = (NativeStackFrame)frame;
+  protected void storeReturnValue(ThreadInfo ti) {
+    NativeStackFrame nativeFrame = (NativeStackFrame)ti.getTopFrame();
 
     returnFrame = nativeFrame;
 
@@ -107,35 +99,7 @@ public class NATIVERETURN extends JVMReturnInstruction {
   }
 
   @Override
-  public int getReturnTypeSize() {
-    switch (retType) {
-    case Types.T_BOOLEAN:
-    case Types.T_BYTE:
-    case Types.T_CHAR:
-    case Types.T_SHORT:
-    case Types.T_INT:
-    case Types.T_FLOAT:
-      return 1;
-      
-    case Types.T_LONG:
-    case Types.T_DOUBLE:
-      return 2;
-
-    default:
-      return 1;
-    }
-  }
-
-  // this is only called internally right before we return
-  @Override
-  protected Object getReturnedOperandAttr (StackFrame frame) {
-    return retAttr;
-  }
-
-  // <2do> this should use the getResult..() methods of NativeStackFrame
-  
-  @Override
-  protected void pushReturnValue (StackFrame fr) {
+  protected void pushReturnValue (ThreadInfo ti) {
     int  ival;
     long lval;
     int  retSize = 1;
@@ -147,51 +111,52 @@ public class NATIVERETURN extends JVMReturnInstruction {
       switch (retType) {
       case Types.T_BOOLEAN:
         ival = Types.booleanToInt(((Boolean) ret).booleanValue());
-        fr.push(ival);
+        ti.push(ival, false);
         break;
 
       case Types.T_BYTE:
-        fr.push(((Byte) ret).byteValue());
+        ti.push(((Byte) ret).byteValue(), false);
         break;
 
       case Types.T_CHAR:
-        fr.push(((Character) ret).charValue());
+        ti.push(((Character) ret).charValue(), false);
         break;
 
       case Types.T_SHORT:
-        fr.push(((Short) ret).shortValue());
+        ti.push(((Short) ret).shortValue(), false);
         break;
 
       case Types.T_INT:
-        fr.push(((Integer) ret).intValue());
+        ti.push(((Integer) ret).intValue(), false);
         break;
 
       case Types.T_LONG:
-        fr.pushLong(((Long)ret).longValue());
+        ti.longPush(((Long) ret).longValue());
         retSize=2;
         break;
 
       case Types.T_FLOAT:
         ival = Types.floatToInt(((Float) ret).floatValue());
-        fr.push(ival);
+        ti.push(ival, false);
         break;
 
       case Types.T_DOUBLE:
         lval = Types.doubleToLong(((Double) ret).doubleValue());
-        fr.pushLong(lval);
+        ti.longPush(lval);
         retSize=2;
         break;
 
       default:
         // everything else is supposed to be a reference
-        fr.push(((Integer) ret).intValue(), true);
+        ti.push(((Integer) ret).intValue(), true);
       }
 
       if (retAttr != null) {
+        StackFrame frame = ti.getTopFrame(); // no need to clone anymore after pushing the value
         if (retSize == 1) {
-          fr.setOperandAttr(retAttr);
+          frame.setOperandAttr(retAttr);
         } else {
-          fr.setLongOperandAttr(retAttr);
+          frame.setLongOperandAttr(retAttr);
         }
       }
     }
@@ -218,7 +183,6 @@ public class NATIVERETURN extends JVMReturnInstruction {
     }
   }
 
-  @Override
   public String toString(){
     StringBuilder sb = new StringBuilder();
     sb.append("nativereturn ");

@@ -1,90 +1,55 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.jvm.bytecode;
 
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.FieldInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.MethodInfo;
-import gov.nasa.jpf.vm.StaticElementInfo;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.bytecode.FieldInstruction;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.FieldInfo;
+import gov.nasa.jpf.jvm.StaticElementInfo;
+import gov.nasa.jpf.jvm.ThreadInfo;
 
 /**
  * class to abstract instructions accessing static fields
  */
 public abstract class StaticFieldInstruction extends FieldInstruction {
 
+  ClassInfo ci;
+
+  protected StaticFieldInstruction(){}
+
   protected StaticFieldInstruction(String fieldName, String clsDescriptor, String fieldDescriptor){
     super(fieldName, clsDescriptor, fieldDescriptor);
   }
 
-  /**
-   * on-demand initialize the ClassInfo and FieldInfo fields. Note that
-   * classinfo might not correspond with the static className, but can be one of
-   * the super classes. Rather than checking for this on each subsequent access,
-   * we get the right one that declares the field here
-   */
-  protected void initialize() {
-    ClassInfo ciRef = mi.getClassInfo().resolveReferencedClass(className);
-    
-    FieldInfo f = ciRef.getStaticField(fname);
-    ClassInfo ciField = f.getClassInfo();
-    if (!ciField.isRegistered()){
-      // classLoaded listeners might change/remove this field
-      ciField.registerClass(ThreadInfo.getCurrentThread());
-      f = ciField.getStaticField(fname);
+  public ClassInfo getClassInfo () {
+    if (ci == null) {
+      ci = ClassInfo.getResolvedClassInfo(className);
     }
-    
-    fi = f;
+    return ci;
   }
 
-  /**
-   * who owns the field?
-   * NOTE: this should only be used from a executeInstruction()/instructionExecuted() context
-   */
-  @Override
-  public ElementInfo getElementInfo(ThreadInfo ti){
-    return getFieldInfo().getClassInfo().getStaticElementInfo();
-  }
-  
-  @Override
-  public String toPostExecString(){
-    StringBuilder sb = new StringBuilder();
-    sb.append(getMnemonic());
-    sb.append(' ');
-    sb.append( fi.getFullName());
-    
-    return sb.toString();
-  }
-
-  public ClassInfo getClassInfo() {
+  public FieldInfo getFieldInfo () {
     if (fi == null) {
-      initialize();
-    }
-    return fi.getClassInfo();
-  }
-
-  @Override
-  public FieldInfo getFieldInfo() {
-    if (fi == null) {
-      initialize();
+      ClassInfo ci = getClassInfo();
+      if (ci != null) {
+        fi = ci.getStaticField(fname);
+      }
     }
     return fi;
   }
@@ -93,17 +58,15 @@ public abstract class StaticFieldInstruction extends FieldInstruction {
    *  that's invariant, as opposed to InstanceFieldInstruction, so it's
    *  not really a peek
    */
-  @Override
   public ElementInfo peekElementInfo (ThreadInfo ti) {
     return getLastElementInfo();
   }
 
-  @Override
   public StaticElementInfo getLastElementInfo() {
     return getFieldInfo().getClassInfo().getStaticElementInfo();
   }
 
-  // this can be different than ciField - the field might be in one of its
+  // this can be different than ci - the field might be in one of its
   // superclasses
   public ClassInfo getLastClassInfo(){
     return getFieldInfo().getClassInfo();
@@ -113,26 +76,66 @@ public abstract class StaticFieldInstruction extends FieldInstruction {
     return getLastClassInfo().getName();
   }
 
-  public void accept(JVMInstructionVisitor insVisitor) {
-	  insVisitor.visit(this);
+  protected boolean isNewPorFieldBoundary (ThreadInfo ti) {
+    return !ti.isFirstStepInsn() && ti.usePorFieldBoundaries() && isSchedulingRelevant(ti);
   }
 
-  @Override
-  public Instruction typeSafeClone(MethodInfo mi) {
-    StaticFieldInstruction clone = null;
+  protected boolean isSchedulingRelevant (ThreadInfo ti) {
 
-    try {
-      clone = (StaticFieldInstruction) super.clone();
-
-      // reset the method that this insn belongs to
-      clone.mi = mi;
-      clone.fi = null; // ClassInfo is going to be different
-      
-    } catch (CloneNotSupportedException e) {
-      e.printStackTrace();
+    // this should filter out the bulk in most real apps (library code)
+    if (fi.neverBreak()) {
+      return false;
     }
 
-    return clone;
+    if (!ti.hasOtherRunnables()) {
+      return false;
+    }
+    // from here on, we can regard this field as shared
+
+    if (ti.usePorSyncDetection()) {
+      FieldInfo fi = getFieldInfo();
+
+      if (fi.breakShared()) {
+        // this one is supposed to be always treated as transition boundary
+        return true;
+      }
+
+      // NOTE - we only encounter this for references, other static finals
+      // will be inlined by the compiler
+      if (skipFinals && fi.isFinal()) {
+        return false;
+      }
+
+      if (skipStaticFinals && fi.isFinal()) {
+        return false;
+      }
+
+      if (mi.isClinit() && (fi.getClassInfo() == mi.getClassInfo())) {
+        // clinits are all synchronized, so they don't count
+        return false;
+      }
+
+      if (isMonitorEnterPrologue()) {
+        return false;
+      }
+
+      ElementInfo ei = fi.getClassInfo().getStaticElementInfo();
+      if (ei.isImmutable()){
+        return false;
+      }
+      if (!ei.checkUpdatedSharedness(ti)){
+        return false;
+      }
+      if (isLockProtected(ti, ei)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  public void accept(InstructionVisitor insVisitor) {
+	  insVisitor.visit(this);
   }
 }
 

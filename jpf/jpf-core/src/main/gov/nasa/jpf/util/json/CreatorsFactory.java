@@ -1,25 +1,26 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2011 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 
 package gov.nasa.jpf.util.json;
 
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.MJIEnv;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.MJIEnv;
 
 import java.util.HashMap;
 
@@ -46,15 +47,14 @@ public class CreatorsFactory {
 
 
 class BoxedBoolCreator implements Creator {
-  @Override
   public int create(MJIEnv env, String typeName, Value value) {
     Boolean read = value.getBoolean();
     int boolRef = MJIEnv.NULL;
 
     if (read != null) {
       boolRef = env.newObject("java.lang.Boolean");
-      ElementInfo ei = env.getModifiableElementInfo(boolRef);
-      ei.setBooleanField("value", (read == true));
+      ElementInfo intEI = env.getElementInfo(boolRef);
+      intEI.setIntField("value", (read == true) ? 1 : 0);
     }
 
     return boolRef;
@@ -62,15 +62,14 @@ class BoxedBoolCreator implements Creator {
 }
 
 class BoxedByteCreator implements Creator {
-  @Override
   public int create(MJIEnv env, String typeName, Value value) {
     Double read = value.getDouble();
     int byteRef = MJIEnv.NULL;
 
     if (read != null) {
       byteRef = env.newObject("java.lang.Byte");
-      ElementInfo ei = env.getModifiableElementInfo(byteRef);
-      ei.setByteField("value", read.byteValue());
+      ElementInfo intEI = env.getElementInfo(byteRef);
+      intEI.setIntField("value", read.byteValue());
     }
 
     return byteRef;
@@ -78,15 +77,14 @@ class BoxedByteCreator implements Creator {
 }
 
 class BoxedShortCreator implements Creator {
-  @Override
   public int create(MJIEnv env, String typeName, Value value) {
     Double read = value.getDouble();
     int shortRef = MJIEnv.NULL;
 
     if (read != null) {
       shortRef = env.newObject("java.lang.Short");
-      ElementInfo ei = env.getModifiableElementInfo(shortRef);
-      ei.setShortField("value", read.shortValue());
+      ElementInfo intEI = env.getElementInfo(shortRef);
+      intEI.setIntField("value", read.shortValue());
     }
 
     return shortRef;
@@ -94,15 +92,14 @@ class BoxedShortCreator implements Creator {
 }
 
 class BoxedIntCreator implements Creator {
-  @Override
   public int create(MJIEnv env, String typeName, Value value) {
     Double read = value.getDouble();
     int intRef = MJIEnv.NULL;
 
     if (read != null) {
       intRef = env.newObject("java.lang.Integer");
-      ElementInfo ei = env.getModifiableElementInfo(intRef);
-      ei.setIntField("value", read.intValue());
+      ElementInfo intEI = env.getElementInfo(intRef);
+      intEI.setIntField("value", read.intValue());
     }
 
     return intRef;
@@ -110,15 +107,14 @@ class BoxedIntCreator implements Creator {
 }
 
 class BoxedLongCreator implements Creator {
-  @Override
   public int create(MJIEnv env, String typeName, Value value) {
     Double read = value.getDouble();
     int longRef = MJIEnv.NULL;
 
     if (read != null) {
       longRef = env.newObject("java.lang.Long");
-      ElementInfo ei = env.getModifiableElementInfo(longRef);
-      ei.setLongField("value", read.longValue());
+      ElementInfo intEI = env.getElementInfo(longRef);
+      intEI.setLongField("value", read.longValue());
     }
 
     return longRef;
@@ -126,15 +122,18 @@ class BoxedLongCreator implements Creator {
 }
 
 class BoxedFloatCreator implements Creator {
-  @Override
   public int create(MJIEnv env, String typeName, Value value) {
     Double read = value.getDouble();
     int floatRef = MJIEnv.NULL;
 
     if (read != null) {
       floatRef = env.newObject("java.lang.Float");
-      ElementInfo ei = env.getModifiableElementInfo(floatRef);
-      ei.setFloatField("value", read.floatValue());
+      ElementInfo intEI = env.getElementInfo(floatRef);
+
+      Float flt = read.floatValue();
+
+
+      intEI.setIntField("value", flt.floatToIntBits(flt));
     }
 
     return floatRef;
@@ -142,15 +141,14 @@ class BoxedFloatCreator implements Creator {
 }
 
 class BoxedDoubleCreator implements Creator {
-  @Override
   public int create(MJIEnv env, String typeName, Value value) {
     Double read = value.getDouble();
     int doubleRef = MJIEnv.NULL;
 
     if (read != null) {
       doubleRef = env.newObject("java.lang.Double");
-      ElementInfo ei = env.getModifiableElementInfo(doubleRef);
-      ei.setDoubleField("value", read.doubleValue());
+      ElementInfo intEI = env.getElementInfo(doubleRef);
+      intEI.setDoubleField("value", read.doubleValue());
     }
 
     return doubleRef;
@@ -159,7 +157,6 @@ class BoxedDoubleCreator implements Creator {
 
 class StringCreator implements Creator {
 
-  @Override
   public int create(MJIEnv env, String typeName, Value value) {
     String strVal = value.getString();
     int stringRef = MJIEnv.NULL;

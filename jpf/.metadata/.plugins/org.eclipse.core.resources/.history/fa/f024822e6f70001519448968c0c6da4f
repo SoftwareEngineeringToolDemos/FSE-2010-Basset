@@ -1,6 +1,0 @@
-target = gov.nasa.jpf.actor.Basset
-
-target_args = server.Driver
-
-basset.language = foundry
-basset.tracestats = true

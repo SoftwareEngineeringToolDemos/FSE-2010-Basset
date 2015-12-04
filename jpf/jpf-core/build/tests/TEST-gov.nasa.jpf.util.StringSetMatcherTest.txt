@@ -1,7 +1,0 @@
-Testsuite: gov.nasa.jpf.util.StringSetMatcherTest
-Tests run: 4, Failures: 0, Errors: 0, Time elapsed: 0.017 sec
-
-Testcase: testInversion took 0.002 sec
-Testcase: testHasAnyPattern took 0.001 sec
-Testcase: testMatchesAll took 0.001 sec
-Testcase: testMatchesAny took 0 sec

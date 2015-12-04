@@ -1,138 +1,108 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.jvm.bytecode;
 
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.FieldInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.MJIEnv;
-import gov.nasa.jpf.vm.Scheduler;
-import gov.nasa.jpf.vm.StackFrame;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.bytecode.ReadInstruction;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.FieldInfo;
+import gov.nasa.jpf.jvm.KernelState;
+import gov.nasa.jpf.jvm.SystemState;
+import gov.nasa.jpf.jvm.ThreadInfo;
 
 
 /**
  * Fetch field from object
  * ..., objectref => ..., value
  */
-public class GETFIELD extends JVMInstanceFieldInstruction implements ReadInstruction {
+public class GETFIELD extends InstanceFieldInstruction {
 
   public GETFIELD (String fieldName, String classType, String fieldDescriptor){
     super(fieldName, classType, fieldDescriptor);
   }
-  
-  
-  @Override
-  public int getObjectSlot (StackFrame frame){
-    return frame.getTopPos();
-  }
-  
-  @Override
-  public Instruction execute (ThreadInfo ti) {
-    StackFrame frame = ti.getModifiableTopFrame();
-    int objRef = frame.peek(); // don't pop yet, we might re-enter
+
+  public Instruction execute (SystemState ss, KernelState ks, ThreadInfo ti) {
+    int objRef = ti.peek(); // don't pop yet, we might re-execute
     lastThis = objRef;
-
-    //--- check for obvious exceptions
-    if (objRef == MJIEnv.NULL) {
+    if (objRef == -1) {
       return ti.createAndThrowException("java.lang.NullPointerException",
-              "referencing field '" + fname + "' on null object");
+                                        "referencing field '" + fname + "' on null object");
     }
 
-    ElementInfo eiFieldOwner = ti.getElementInfo(objRef);
-    FieldInfo fieldInfo = getFieldInfo();
-    if (fieldInfo == null) {
+    ElementInfo ei = ti.getElementInfo(objRef);
+
+    FieldInfo fi = getFieldInfo();
+    if (fi == null) {
       return ti.createAndThrowException("java.lang.NoSuchFieldError",
-              "referencing field '" + fname + "' in " + eiFieldOwner);
+                                        "referencing field '" + fname + "' in " + ei);
     }
 
-    //--- check for potential transition breaks (be aware everything above gets re-executed)
-    Scheduler scheduler = ti.getScheduler();
-    if (scheduler.canHaveSharedObjectCG( ti, this, eiFieldOwner, fieldInfo)){
-      eiFieldOwner = scheduler.updateObjectSharedness( ti, eiFieldOwner, fieldInfo);
-      if (scheduler.setsSharedObjectCG( ti, this, eiFieldOwner, fieldInfo)){
-        return this; // re-execute
+    // check if this breaks the current transition
+    if (isNewPorFieldBoundary(ti, fi, objRef)) {
+      if (createAndSetFieldCG(ss, ei, ti)) {
+        return this;
       }
     }
-    
-    frame.pop(); // Ok, now we can remove the object ref from the stack
-    Object fieldAttr = eiFieldOwner.getFieldAttr(fieldInfo);
 
-    // We could encapsulate the push in ElementInfo, but not the GET, so we keep it at the same level
-    if (fieldInfo.getStorageSize() == 1) { // 1 slotter
-      int ival = eiFieldOwner.get1SlotField(fieldInfo);
+    ti.pop(); // Ok, now we can remove the object ref from the stack
+    Object attr = ei.getFieldAttr(fi);
+
+    // We could encapsulate the push in ElementInfo, but not the GET, so we keep it at a similiar level
+    if (fi.getStorageSize() == 1) { // 1 slotter
+      int ival = ei.get1SlotField(fi);
       lastValue = ival;
-      
-      if (fieldInfo.isReference()){
-        frame.pushRef(ival);
-        
-      } else {
-        frame.push(ival);
-      }
-      
-      if (fieldAttr != null) {
-        frame.setOperandAttr(fieldAttr);
+
+      ti.push(ival, fi.isReference());
+      if (attr != null) {
+        ti.setOperandAttrNoClone(attr);
       }
 
     } else {  // 2 slotter
-      long lval = eiFieldOwner.get2SlotField(fieldInfo);
+      long lval = ei.get2SlotField(fi);
       lastValue = lval;
 
-      frame.pushLong( lval);
-      if (fieldAttr != null) {
-        frame.setLongOperandAttr(fieldAttr);
+      ti.longPush(lval);
+      if (attr != null) {
+        ti.setLongOperandAttrNoClone(attr);
       }
     }
 
     return getNext(ti);
   }
 
-  @Override
   public ElementInfo peekElementInfo (ThreadInfo ti) {
-    StackFrame frame = ti.getTopFrame();
-    int objRef = frame.peek();
+    int objRef = ti.peek();
     ElementInfo ei = ti.getElementInfo(objRef);
     return ei;
   }
 
-  @Override
-  public boolean isMonitorEnterPrologue(){
-    return GetHelper.isMonitorEnterPrologue(mi, insnIndex);
-  }
-  
-  @Override
   public int getLength() {
     return 3; // opcode, index1, index2
   }
 
-  @Override
   public int getByteCode () {
     return 0xB4;
   }
 
-  @Override
   public boolean isRead() {
     return true;
   }
 
-  @Override
-  public void accept(JVMInstructionVisitor insVisitor) {
+  public void accept(InstructionVisitor insVisitor) {
 	  insVisitor.visit(this);
   }
 }

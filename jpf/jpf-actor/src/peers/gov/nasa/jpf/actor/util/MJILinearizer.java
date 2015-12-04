@@ -20,10 +20,10 @@ package gov.nasa.jpf.actor.util;
 
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.actor.core.Util;
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.FieldInfo;
-import gov.nasa.jpf.vm.MJIEnv;
-import gov.nasa.jpf.vm.Types;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.FieldInfo;
+import gov.nasa.jpf.jvm.MJIEnv;
+import gov.nasa.jpf.jvm.Types;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -95,7 +95,7 @@ public class MJILinearizer {
     // of object graphs from linearizations.
     ClassInfo ci = env.getClassInfo(objref);
     // System.out.println("ci: " + ci);
-    int classref = (int)ci.getUniqueId();
+    int classref = ci.getUniqueId();
 
     // //////// current code
     // result.add(classref);

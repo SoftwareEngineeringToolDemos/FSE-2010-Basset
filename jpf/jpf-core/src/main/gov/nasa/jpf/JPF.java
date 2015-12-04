@@ -1,22 +1,26 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf;
 
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.NoOutOfMemoryErrorProperty;
+import gov.nasa.jpf.jvm.VMListener;
 import gov.nasa.jpf.report.Publisher;
 import gov.nasa.jpf.report.PublisherExtension;
 import gov.nasa.jpf.report.Reporter;
@@ -27,9 +31,6 @@ import gov.nasa.jpf.util.JPFLogger;
 import gov.nasa.jpf.util.LogManager;
 import gov.nasa.jpf.util.Misc;
 import gov.nasa.jpf.util.RunRegistry;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.NoOutOfMemoryErrorProperty;
-import gov.nasa.jpf.vm.VMListener;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -43,7 +44,7 @@ import java.util.logging.Logger;
  */
 public class JPF implements Runnable {
   
-  public static String VERSION = "8.0"; // the major version number
+  public static String VERSION = "6.0"; // the major version number
 
   static Logger logger     = null; // initially
 
@@ -99,7 +100,7 @@ public class JPF implements Runnable {
   Search search;
 
   /** Reference to the virtual machine used by the search */
-  VM vm;
+  JVM vm;
 
   /** the report generator */
   Reporter reporter;
@@ -248,7 +249,12 @@ public class JPF implements Runnable {
       logger = initLogging(config);
     }
 
-    initialize();
+    String tgt = config.getTarget();
+    if (tgt == null || (tgt.length() == 0)) {
+      logger.severe("no target class specified, terminating");
+    } else {
+      initialize();
+    }
   }
 
   /**
@@ -266,9 +272,9 @@ public class JPF implements Runnable {
       
       Class<?>[] vmArgTypes = { JPF.class, Config.class };
       Object[] vmArgs = { this, config };
-      vm = config.getEssentialInstance("vm.class", VM.class, vmArgTypes, vmArgs);
+      vm = config.getEssentialInstance("vm.class", JVM.class, vmArgTypes, vmArgs);
 
-      Class<?>[] searchArgTypes = { Config.class, VM.class };
+      Class<?>[] searchArgTypes = { Config.class, JVM.class };
       Object[] searchArgs = { config, vm };
       search = config.getEssentialInstance("search.class", Search.class,
                                                 searchArgTypes, searchArgs);
@@ -464,10 +470,10 @@ public class JPF implements Runnable {
     return false;
   }
 
-  public <T extends Publisher> void setPublisherItems (Class<T> pCls,
+  public <T extends Publisher> void setPublisherTopics (Class<T> pCls,
                                                         int category, String[] topics) {
     if (reporter != null) {
-      reporter.setPublisherItems(pCls, category, topics);
+      reporter.setPublisherTopics(pCls, category, topics);
     }
   }
 
@@ -486,7 +492,7 @@ public class JPF implements Runnable {
   /**
    * return the VM object. This can be null if the initialization has failed
    */
-  public VM getVM() {
+  public JVM getVM() {
     return vm;
   }
 
@@ -521,9 +527,9 @@ public class JPF implements Runnable {
   }
 
   public static void printBanner (Config config) {
-    System.out.println("Java Pathfinder core system v" +
+    System.out.println("Java Pathfinder Model Checker v" +
                   config.getString("jpf.version", VERSION) +
-                  " - (C) 2005-2014 United States Government. All rights reserved.");
+                  " - (C) 1999-2008 RIACS/NASA Ames Research Center");
   }
 
 
@@ -599,7 +605,6 @@ public class JPF implements Runnable {
   /**
    * runs the verification.
    */
-  @Override
   public void run() {
     Runtime rt = Runtime.getRuntime();
 
@@ -673,15 +678,6 @@ public class JPF implements Runnable {
     return null;
   }
 
-  public Error getLastError () {
-    if (search != null) {
-      return search.getLastError();
-    }
-
-    return null;
-  }
-  
-  
   // some minimal sanity checks
   static boolean checkArgs (String[] args){
     String lastArg = args[args.length-1];

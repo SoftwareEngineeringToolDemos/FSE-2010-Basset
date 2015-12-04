@@ -18,9 +18,9 @@
 //
 package gov.nasa.jpf.actor.util;
 
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.FieldInfo;
-import gov.nasa.jpf.vm.MJIEnv;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.FieldInfo;
+import gov.nasa.jpf.jvm.MJIEnv;
 
 import java.util.HashMap;
 import java.util.HashSet;

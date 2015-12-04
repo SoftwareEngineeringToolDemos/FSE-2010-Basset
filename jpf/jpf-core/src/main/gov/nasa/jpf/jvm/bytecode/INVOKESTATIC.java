@@ -1,72 +1,57 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.jvm.bytecode;
 
 
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.ClassLoaderInfo;
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.LoadOnJPFRequired;
-import gov.nasa.jpf.vm.MethodInfo;
-import gov.nasa.jpf.vm.StaticElementInfo;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.Types;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.KernelState;
+import gov.nasa.jpf.jvm.MethodInfo;
+import gov.nasa.jpf.jvm.StaticElementInfo;
+import gov.nasa.jpf.jvm.SystemState;
+import gov.nasa.jpf.jvm.ThreadInfo;
+import gov.nasa.jpf.jvm.Types;
 
 
 /**
  * Invoke a class (static) method
  * ..., [arg1, [arg2 ...]]  => ...
  */
-public class INVOKESTATIC extends JVMInvokeInstruction {
+public class INVOKESTATIC extends InvokeInstruction {
   ClassInfo ci;
   
   protected INVOKESTATIC (String clsDescriptor, String methodName, String signature){
     super(clsDescriptor, methodName, signature);
   }
 
+
   protected ClassInfo getClassInfo () {
     if (ci == null) {
-      ci = ClassLoaderInfo.getCurrentResolvedClassInfo(cname);
+      ci = ClassInfo.getResolvedClassInfo(cname);
     }
     return ci;
   }
   
-  @Override
   public int getByteCode () {
     return 0xB8;
   }
 
-  @Override
-  public String toPostExecString(){
-    StringBuilder sb = new StringBuilder();
-    sb.append(getMnemonic());
-    sb.append(' ');
-    sb.append( invokedMethod.getFullName());
-
-    if (invokedMethod.isMJI()){
-      sb.append(" [native]");
-    }
-    
-    return sb.toString();
-
-  }
-  
   public StaticElementInfo getStaticElementInfo (){
     return getClassInfo().getStaticElementInfo();
   }
@@ -75,72 +60,69 @@ public class INVOKESTATIC extends JVMInvokeInstruction {
     return getClassInfo().getStaticElementInfo().getClassObjectRef();
   }
 
-  @Override
-  public Instruction execute (ThreadInfo ti) {
-    MethodInfo callee;
-    
-    try {
-      callee = getInvokedMethod(ti);
-    } catch (LoadOnJPFRequired lre) {
-      return ti.getPC();
+  public boolean isExecutable (SystemState ss, KernelState ks, ThreadInfo ti) {
+    MethodInfo mi = getInvokedMethod();
+    if (mi == null) {
+      return true; // execute so that we get the exception
     }
-        
+
+    return mi.isExecutable(ti);
+  }
+
+  public boolean examineAbstraction (SystemState ss, KernelState ks,
+                                     ThreadInfo ti) {
+    MethodInfo mi = getInvokedMethod(ti);
+
+   if (mi == null) {
+      return true;
+    }
+
+    return !ci.isStaticMethodAbstractionDeterministic(ti, mi);
+  }
+
+  public Instruction execute (SystemState ss, KernelState ks, ThreadInfo ti) {
+    
+    // need to check first if we can find the class
+    ClassInfo clsInfo = getClassInfo();
+    if (clsInfo == null){
+      return ti.createAndThrowException("java.lang.NoClassDefFoundError", cname);
+    }
+
+    MethodInfo callee = getInvokedMethod(ti);
     if (callee == null) {
-      return ti.createAndThrowException("java.lang.NoSuchMethodException", cname + '.' + mname);
+      return ti.createAndThrowException("java.lang.NoSuchMethodException",
+                                   cname + '.' + mname);
     }
 
     // this can be actually different than (can be a base)
-    ClassInfo ciCallee = callee.getClassInfo();
+    clsInfo = callee.getClassInfo();
     
-    if (ciCallee.initializeClass(ti)) {
+    if (requiresClinitExecution(ti, clsInfo)) {
       // do class initialization before continuing
-      // note - this returns the next insn in the topmost clinit that just got pushed
       return ti.getPC();
     }
 
     if (callee.isSynchronized()) {
-      ElementInfo ei = ciCallee.getClassObject();
-      ei = ti.getScheduler().updateObjectSharedness(ti, ei, null); // locks most likely belong to shared objects
-      
-      if (reschedulesLockAcquisition(ti, ei)){
+      ElementInfo ei = clsInfo.getClassObject();
+      if (checkSyncCG(ei, ss, ti)){
         return this;
       }
     }
         
-    setupCallee( ti, callee); // this creates, initializes and pushes the callee StackFrame
-
-    return ti.getPC(); // we can't just return the first callee insn if a listener throws an exception
-  }
-
-  @Override
-  public MethodInfo getInvokedMethod(){
-    if (invokedMethod != null){
-      return invokedMethod;
-    } else {
-      // Hmm, this would be pre-exec, but if the current thread is not the one executing the insn 
-      // this might result in false sharedness of the class object
-      return getInvokedMethod( ThreadInfo.getCurrentThread());
-    }
+    // enter the method body, return its first insn
+    return callee.execute(ti);
   }
   
-  @Override
   public MethodInfo getInvokedMethod (ThreadInfo ti){
+    return getInvokedMethod(); 
+  }
+  
+  public MethodInfo getInvokedMethod () {
     if (invokedMethod == null) {
       ClassInfo clsInfo = getClassInfo();
       if (clsInfo != null){
-        MethodInfo callee = clsInfo.getMethod(mname, true);
-        if (callee != null){
-          ClassInfo ciCallee = callee.getClassInfo(); // might be a superclass of ci, i.e. not what is referenced in the insn
-
-          if (!ciCallee.isRegistered()){
-            // if it wasn't registered yet, classLoaded listeners didn't have a chance yet to modify it..
-            ciCallee.registerClass(ti);
-            // .. and might replace/remove MethodInfos
-            callee = clsInfo.getMethod(mname, true);
-          }
-          invokedMethod = callee;
-        }
-      }    
+        invokedMethod = clsInfo.getMethod(mname, true);
+      }
     }
     return invokedMethod;
   }
@@ -154,7 +136,6 @@ public class INVOKESTATIC extends JVMInvokeInstruction {
     return getInvokedClassInfo().getName();
   }
 
-  @Override
   public int getArgSize () {
     if (argSize < 0) {
       argSize = Types.getArgumentsSize(signature);
@@ -164,40 +145,17 @@ public class INVOKESTATIC extends JVMInvokeInstruction {
   }
 
   
-  @Override
   public String toString() {
     // methodInfo not set outside real call context (requires target object)
     return "invokestatic " + cname + '.' + mname;
   }
 
-  @Override
   public Object getFieldValue (String id, ThreadInfo ti) {
     return getClassInfo().getStaticFieldValueObject(id);
   }
   
-  @Override
-  public void accept(JVMInstructionVisitor insVisitor) {
+  public void accept(InstructionVisitor insVisitor) {
 	  insVisitor.visit(this);
-  }
-
-  @Override
-  public Instruction typeSafeClone(MethodInfo mi) {
-    INVOKESTATIC clone = null;
-
-    try {
-      clone = (INVOKESTATIC) super.clone();
-
-      // reset the method that this insn belongs to
-      clone.mi = mi;
-
-      clone.invokedMethod = null;
-      clone.lastObj = Integer.MIN_VALUE;
-      clone.ci = null;
-    } catch (CloneNotSupportedException e) {
-      e.printStackTrace();
-    }
-
-    return clone;
   }
 }
 

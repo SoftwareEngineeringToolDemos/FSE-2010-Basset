@@ -1,23 +1,23 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.util;
 
-import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -25,22 +25,14 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /**
- * more customizable alternative to java.util.Vector. Other than Vector, it
- * supports dynamic growth on set() operations. While it supports list
- * functions such as append, ObjVector resembles mostly an array, i.e.
- * is meant to be a random-access collection
- * 
- * this collection does not keep a count of non-null elements, but does maintain the
- * highest set index as its size through set/add and remove operations. Note that size
- * only shrinks through remove operations, not by setting null values. This means there
- * is no guarantee that data[size-1] is not null. The converse however is true - there is no
- * non-null element at an index >= size.
- * 
+ * more customizable alternative to java.util.Vector.  also, set(x,v) automatically
+ * grows the structure as needed.
  * @author pcd
  */
 public class ObjVector<E> implements ReadOnlyObjList<E>, Cloneable {
-  public static final int defaultInitCap = 40;  
+  public static final int defaultInitCap = 40;
 
+  
   /** <i>size</i> as in a java.util.Vector. */
   protected int size;
   
@@ -49,10 +41,9 @@ public class ObjVector<E> implements ReadOnlyObjList<E>, Cloneable {
   
   /** growth strategy. */
   protected Growth growth;
-    
   
-  //--- constructors
   
+  /*======================== CONSTRUCTORS ======================*/
   public ObjVector(Growth initGrowth, int initCap) {
     growth = initGrowth;
     data = new Object[initCap];
@@ -83,8 +74,8 @@ public class ObjVector<E> implements ReadOnlyObjList<E>, Cloneable {
     System.arraycopy(from.data, 0, this.data, 0, size);
   }
   
-  //--- set/add/remove operations  
   
+  /*========================= PUBLIC METHODS =======================*/
   public void add(E x) {
     if (size >= data.length) {
       ensureCapacity(size+1);
@@ -174,8 +165,7 @@ public class ObjVector<E> implements ReadOnlyObjList<E>, Cloneable {
     return size;
   }
 
-  @Override
-@SuppressWarnings("unchecked")
+  @SuppressWarnings("unchecked")
   public E get(int idx) {
     if (idx >= size) {
       return null;
@@ -189,17 +179,6 @@ public class ObjVector<E> implements ReadOnlyObjList<E>, Cloneable {
     data[idx] = v;
   }
 
-  /**
-   * set range of values
-   * @param fromIndex first index (inclusive)
-   * @param toIndex last index (exclusive)
-   * @param val value to set
-   */
-  public void setRange (int fromIndex, int toIndex, E val) {
-    ensureSize(toIndex);
-    Arrays.fill(data, fromIndex, toIndex, val);
-  }
-  
   public <F> F[] toArray (F[] dst) {
     System.arraycopy(data,0,dst,0,size);
     return dst;
@@ -216,7 +195,6 @@ public class ObjVector<E> implements ReadOnlyObjList<E>, Cloneable {
     return pos + size;
   }
 
-  @Override
   public ObjVector<E> clone() {
     return new ObjVector<E>(this);
   }
@@ -238,39 +216,16 @@ public class ObjVector<E> implements ReadOnlyObjList<E>, Cloneable {
   }
 
   public void clear() { 
+    //setSize(0);
+
     // faster than iterating over the whole array
     data = new Object[data.length];
     size = 0;
   }
   
-  @SuppressWarnings("unchecked")
-  public void clearAllSatisfying (Predicate<E> pred) {
-    Object[] d = data;
-    int newSize = 0;
-    for (int i=size-1; i>=0; i--) {
-      E e = (E)d[i];
-      if (e != null) {
-        if (pred.isTrue(e)) {
-          d[i] = null;
-        } else {
-          if (newSize == 0) {
-            newSize = i+1;
-          }
-        }
-      }
-    }
-    
-    size = newSize;
-  }
+  public int size() { return size; }
   
-  public int size() { 
-    return size; 
-  }
-  
-  @Override
-  public int length() {
-    return size;
-  }
+  public int length() { return size; }
   
   public void ensureSize(int sz) {
     if (size < sz) {
@@ -306,6 +261,21 @@ public class ObjVector<E> implements ReadOnlyObjList<E>, Cloneable {
     System.arraycopy(src.data, srcPos, dst, dstPos, len);
   }
 
+  public int removeAll() {
+    int n=0;
+    Object[] data = this.data;
+    int len = size;
+
+    for (int i=0; i<len; i++){
+      if (data[i] != null){
+        data[i] = null;
+        n++;
+      }
+    }
+    size = 0;
+    return n;
+  }
+
   /**
    * remove all non-null elements between 'fromIdx' (inclusive) and
    * 'toIdx' (exclusive)
@@ -339,264 +309,9 @@ public class ObjVector<E> implements ReadOnlyObjList<E>, Cloneable {
     return removeRange(fromIdx,size);
   }
 
-  public E remove (int i) {
-    E e = (E) data[i];
-    
-    if (e != null) {
-      data[i] = null;
-      if (i+1 == size) {
-        int j=i-1;
-        for (; j>=0 && (data[j] == null); j--); 
-        size = j+1;
-      }
-    }
-    
-    return e;
-  }
-
-  //--- store/restore snapshot operations
-    
-  static final int DEFAULT_MAX_GAP = 10;
-  
-  /**
-   * this is a block operation snapshot that stores chunks of original data with
-   * not more than DEFAULT_MAX_GAP consecutive null elements. Use this if 
-   * elements can be stored directly
-   */
-  public static class Snapshot<E> {
-    static class Block {
-      int baseIndex;
-      Object[] data;
-      Block next;
-      
-      Block (int baseIndex, Object[] data, Block next){
-        this.baseIndex = baseIndex;
-        this.data = data;
-        this.next = next;
-      }
-    }
-    
-    // the ObjVector state we directly store
-    int size;
-    Growth growth;
-    
-    // where we keep the data
-    Block head;
-    
-    int saveBlock (Object[] d, int start, int end) {
-      int len = end-start+1;
-      Object[] bd = new Object[len];
-      System.arraycopy(d, start, bd, 0, len);
-      head = new Block(start, bd, head);      
-      
-      return len;
-    }
-    
-    Snapshot (ObjVector<E> v, int maxGap){
-      int n = v.size;
-      size = n;
-      growth = v.growth;      
-      Object[] d = v.data;
-      
-      int end = -1, start = -1;
-      
-      for (int i=n-1; (i>=0) && (n>0); i--) {
-        if (d[i] != null) {
-          if (start > 0 && (start - i) > maxGap ) { // store prev block
-            n -= saveBlock( d, start, end);              
-            end = i;
-            start = i;
-            
-          } else {
-            if (end < 0) {
-              end = i;
-            }
-            start = i;
-          }
-        }
-      }
-      
-      if (end >=0 && end >= start) {
-        saveBlock( d, start, end);
-      }
-    }    
-    
-    public void restore (ObjVector<E> v) {
-      // this is faster than iterating through the array
-      Object[] d = new Object[size];
-      v.data = d;
-
-      for (Block block = head; block != null; block = block.next) {
-        Object[] bd = block.data;
-        System.arraycopy(bd, 0, d, block.baseIndex, bd.length);
-      }
-      
-      v.size = size;
-      v.growth = growth;
-    }
-  }
-
-  
-  public Snapshot<E> getSnapshot(){
-    return new Snapshot<E>(this, DEFAULT_MAX_GAP);
-  }
-  
-  /**
-   * create a snapshot that doesn't store more than maxGap consecutive null values
-   */
-  public Snapshot<E> getSnapshot( int maxGap){
-    return new Snapshot<E>(this, maxGap);
-  }
-  
-  public void restore (Snapshot<E> snap) {
-    snap.restore(this);
-  }
-
-  
-  /**
-   *  snapshot that can mutate element values, but therefore can't use block operations.
-   *  This is slower to store/restore, but can be more memory efficient if the elements
-   *  are fragmented (lots of small holes in data)
-   */
-  
-  public static class MutatingSnapshot<E,T>{
-    T[] values;
-    int[] indices;
-    
-    @SuppressWarnings("unchecked")
-    MutatingSnapshot (ObjVector<E> vec, Transformer<E,T> transformer){
-      E[] d = (E[])vec.data;
-      int size = vec.size;
-      int len = 0;
-      
-      //--- get number of non-null elements
-      for (int i=0; i<size; i++) {
-        if (d[i] != null) {
-          len++;
-        }
-      }
-      
-      //--- allocate data
-      T[] values = (T[])new Object[len];
-      int[] indices = new int[len];
-      
-      //--- fill it
-      int j=0;
-      for (int i=0; j < len; i++) {
-        if (d[i] != null) {
-          indices[j] = i;
-          values[j] = transformer.transform(d[i]);
-          j++;
-        }
-      }
-      
-      this.values = values;
-      this.indices = indices;
-    }
-    
-    @SuppressWarnings("unchecked")
-    protected void restore (ObjVector<E> vec, Transformer<T,E> transformer) {
-      T[] values = this.values;
-      int[] indices = this.indices;
-      int len = indices.length;
-      int size = indices[len-1] +1;
-
-      vec.clear();
-      vec.ensureSize(size);
-      E[] d = (E[])vec.data;
-
-      for (int i=0; i<len; i++){
-        E obj = transformer.transform(values[i]);
-        int index = indices[i];
-        d[index] = obj;
-      }
-      
-      vec.size = size;
-    }
-  }
-  
-  public <T> MutatingSnapshot<E,T> getSnapshot( Transformer<E,T> transformer){
-    return new MutatingSnapshot<E,T>(this, transformer);
-  }
-  
-  public <T> void restore (MutatingSnapshot<E,T> snap, Transformer<T,E> transformer) {
-    snap.restore(this, transformer);
-  }
-  
-
-  //--- iterators
-  
-  /**
-   * iterator that goes over all elements regardless of value (i.e. also includes null values)
-   */
-  protected class OVIterator implements Iterator<E> {
-    int idx = 0;
-    
-    @Override
-	public boolean hasNext () {
-      return idx < size;
-    }
-
-    @Override
-	@SuppressWarnings("unchecked")
-    public E next () {
-      if (idx >= data.length) throw new NoSuchElementException();
-      E e = (E) data[idx];
-      idx++;
-      return e;
-    }
-
-    @Override
-	public void remove () {
-      throw new UnsupportedOperationException();
-    }
-  }
-
-  @Override
   public Iterator<E> iterator () {
     return new OVIterator();
   }
-  
-  /**
-   * iterator that only includes element values that are not null
-   */
-  protected class NonNullIterator implements Iterator<E>, Iterable<E> {
-    int idx = 0;
-    //int count = 0;
-
-    @Override
-	public boolean hasNext() {
-      return (idx < size); // size is max set index
-    }
-
-    @Override
-	@SuppressWarnings("unchecked")
-    public E next () {
-      int len = data.length;
-      for (int i=idx; i<len; i++){
-        Object o = data[i];
-        if (o != null){
-          //count++;
-          idx = i+1;
-          return (E)o;
-        }
-      }
-
-      throw new NoSuchElementException();
-    }
-
-    @Override
-	public void remove () {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-	public Iterator<E> iterator() {
-      return this;
-    }
-  }
-  
-
 
   public Iterator<E> nonNullIterator() {
     return new NonNullIterator();
@@ -606,26 +321,56 @@ public class ObjVector<E> implements ReadOnlyObjList<E>, Cloneable {
     return new NonNullIterator();
   }
 
-  public void process (Processor<E> processor) {
-    for (int i=0; i<data.length; i++) {
-      Object o = data[i];
-      if (o != null) {
-        processor.process( (E)o);
-      }
+  class OVIterator implements Iterator<E> {
+    int idx = 0;
+    
+    public boolean hasNext () {
+      return idx < size;
+    }
+
+    @SuppressWarnings("unchecked")
+    public E next () {
+      if (idx >= data.length) throw new NoSuchElementException();
+      E e = (E) data[idx];
+      idx++;
+      return e;
+    }
+
+    public void remove () {
+      throw new UnsupportedOperationException();
     }
   }
 
-  //--- misc (debugging etc.)
-  
-  public void printOn (PrintStream ps) {
-    ps.println("ObjVector = [");
-    for (int i=0; i<size; i++) {
-      ps.print("  ");
-      ps.print(i);
-      ps.print(": ");
-      ps.println(get(i));
+  class NonNullIterator implements Iterator<E>, Iterable<E> {
+    int idx = 0;
+    int count = 0;
+
+    public boolean hasNext() {
+      return (count < size && idx < size);
     }
-    ps.println(']');
+
+    @SuppressWarnings("unchecked")
+    public E next () {
+      int len = data.length;
+      for (int i=idx; i<len; i++){
+        Object o = data[i];
+        if (o != null){
+          count++;
+          idx = i+1;
+          return (E)o;
+        }
+      }
+
+      throw new NoSuchElementException();
+    }
+
+    public void remove () {
+      throw new UnsupportedOperationException();
+    }
+
+    public Iterator<E> iterator() {
+      return this;
+    }
   }
 
 }

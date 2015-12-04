@@ -1,46 +1,43 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.listener;
 
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.JPF;
 import gov.nasa.jpf.ListenerAdapter;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.MethodInfo;
+import gov.nasa.jpf.jvm.ThreadInfo;
 import gov.nasa.jpf.jvm.bytecode.ALOAD;
 import gov.nasa.jpf.jvm.bytecode.ArrayStoreInstruction;
-import gov.nasa.jpf.jvm.bytecode.JVMFieldInstruction;
+import gov.nasa.jpf.jvm.bytecode.FieldInstruction;
 import gov.nasa.jpf.jvm.bytecode.GETFIELD;
 import gov.nasa.jpf.jvm.bytecode.GETSTATIC;
-import gov.nasa.jpf.vm.bytecode.ReadInstruction;
-import gov.nasa.jpf.vm.bytecode.StoreInstruction;
-import gov.nasa.jpf.vm.bytecode.LocalVariableInstruction;
+import gov.nasa.jpf.jvm.bytecode.Instruction;
+import gov.nasa.jpf.jvm.bytecode.StoreInstruction;
+import gov.nasa.jpf.jvm.bytecode.VariableAccessor;
 import gov.nasa.jpf.report.ConsolePublisher;
 import gov.nasa.jpf.report.Publisher;
 import gov.nasa.jpf.search.Search;
 import gov.nasa.jpf.util.MethodSpec;
 import gov.nasa.jpf.util.StringSetMatcher;
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.MJIEnv;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.MethodInfo;
-import gov.nasa.jpf.vm.StackFrame;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.bytecode.WriteInstruction;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -89,7 +86,6 @@ public class VarTracker extends ListenerAdapter {
     jpf.addPublisherExtension(ConsolePublisher.class, this);
   }
 
-  @Override
   public void publishPropertyViolation (Publisher publisher) {
     PrintWriter pw = publisher.getOut();
     publisher.publishTopicStart("field access ");
@@ -131,7 +127,6 @@ public class VarTracker extends ListenerAdapter {
     }
   }
   
-  @Override
   public void stateAdvanced(Search search) {
     
     if (search.isNewState()) { // don't count twice
@@ -161,70 +156,58 @@ public class VarTracker extends ListenerAdapter {
 
     queue.clear();
   }
-
+  
+  
   // <2do> - general purpose listeners should not use types such as String for storing
   // attributes, there is no good way to make sure you retrieve your own attributes
-  @Override
-  public void instructionExecuted(VM vm, ThreadInfo ti, Instruction nextInsn, Instruction executedInsn) {
+      
+  public void instructionExecuted(JVM jvm) {
+    Instruction insn = jvm.getLastInstruction();
+    ThreadInfo ti = jvm.getLastThreadInfo();
     String varId;
-
-    if (executedInsn instanceof ALOAD) {
+    
+    if ( ((((insn instanceof GETFIELD) || (insn instanceof GETSTATIC)))
+            && ((FieldInstruction)insn).isReferenceField()) ||
+         (insn instanceof ALOAD)) {
       // a little extra work - we need to keep track of variable names, because
       // we cannot easily retrieve them in a subsequent xASTORE, which follows
       // a pattern like:  ..GETFIELD.. some-stack-operations .. xASTORE
-      StackFrame frame = ti.getTopFrame();
-      int objRef = frame.peek();
-      if (objRef != MJIEnv.NULL) {
-        ElementInfo ei = ti.getElementInfo(objRef);
+      int objRef = ti.peek();
+      if (objRef != -1) {
+        ElementInfo ei = jvm.getHeap().get(objRef);
         if (ei.isArray()) {
-          varId = ((LocalVariableInstruction) executedInsn).getVariableId();
-
+          varId = ((VariableAccessor)insn).getVariableId();
+          
           // <2do> unfortunately, we can't filter here because we don't know yet
           // how the array ref will be used (we would only need the attr for
           // subsequent xASTOREs)
-          frame = ti.getModifiableTopFrame();
-          frame.addOperandAttr(varId);
+          ti.addOperandAttr( varId);
         }
       }
-
-    } else if ((executedInsn instanceof ReadInstruction) && ((JVMFieldInstruction)executedInsn).isReferenceField()){
-      varId = ((JVMFieldInstruction)executedInsn).getFieldName();
-
-      StackFrame frame = ti.getModifiableTopFrame();
-      frame.addOperandAttr(varId);
-
-
+    }
     // here come the changes - note that we can't update the stats right away,
     // because we don't know yet if the state this leads into has already been
     // visited, and we want to detect only var changes that lead to *new* states
-    // (objective is to find out why we have new states). Note that variable
-    // changes do not necessarily contribute to the state hash (@FilterField)
-  } else if (executedInsn instanceof StoreInstruction) {
-      if (executedInsn instanceof ArrayStoreInstruction) {
+    // (objective is to find out why we have new states)
+    else if (insn instanceof StoreInstruction) {
+      if (insn instanceof ArrayStoreInstruction) {
         // did we have a name for the array?
         // stack is ".. ref idx [l]value => .."
         // <2do> String is not a good attribute type to retrieve
-        Object attr = ((ArrayStoreInstruction)executedInsn).getArrayOperandAttr(ti);
+        String attr = ti.getOperandAttr(1, String.class);
         if (attr != null) {
           varId = attr + "[]";
         } else {
           varId = "?[]";
         }
       } else {
-        varId = ((LocalVariableInstruction)executedInsn).getVariableId();
+        varId = ((VariableAccessor)insn).getVariableId();
       }
-      queueIfRelevant(ti, executedInsn, varId);
-
-    } else if (executedInsn instanceof WriteInstruction){
-      varId = ((WriteInstruction) executedInsn).getFieldInfo().getFullName();
-      queueIfRelevant(ti, executedInsn, varId);
-    }
-  }
-
-  void queueIfRelevant(ThreadInfo ti, Instruction insn, String varId){
-    if (isMethodRelevant(insn.getMethodInfo()) && isVarRelevant(varId)) {
-      queue.add(new VarChange(varId));
-      lastThread = ti;
+      
+      if (isMethodRelevant(insn.getMethodInfo()) && isVarRelevant(varId)) {
+        queue.add(new VarChange(varId));
+        lastThread = ti;
+      }
     }
   }
 
@@ -272,7 +255,6 @@ class VarStat implements Comparable<VarStat> {
     return nChanges;
   }
   
-  @Override
   public int compareTo (VarStat other) {
     if (other.nChanges > nChanges) {
       return 1;

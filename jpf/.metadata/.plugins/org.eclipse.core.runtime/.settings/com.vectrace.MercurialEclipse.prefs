@@ -1,7 +1,0 @@
-//def_repo_repo_/Users/Gaurav/projects/jpf/jpf-actor=http\://babelfish.arc.nasa.gov/hg/jpf/jpf-actor
-//def_repo_repo_/Users/Gaurav/projects/jpf/jpf-core=http\://babelfish.arc.nasa.gov/hg/jpf/jpf-core
-//repo_/Users/Gaurav/projects/jpf/jpf-actor=d46 http\://babelfish.arc.nasa.gov/hg/jpf/jpf-actor 0  0  0 |
-//repo_/Users/Gaurav/projects/jpf/jpf-core=d45 http\://babelfish.arc.nasa.gov/hg/jpf/jpf-core 0  0  0 |
-eclipse.preferences.version=1
-hg=/usr/local/bin/hg
-repo_=d45 http\://babelfish.arc.nasa.gov/hg/jpf/jpf-core 0  0  0 |d46 http\://babelfish.arc.nasa.gov/hg/jpf/jpf-actor 0  0  0 |

@@ -34,15 +34,15 @@ import gov.nasa.jpf.actor.common.DPORIntChoiceGeneratorTransistent;
 import gov.nasa.jpf.actor.common.DPORIntChoiceGeneratorTransistentSleep;
 import gov.nasa.jpf.actor.core.CoreActorName;
 import gov.nasa.jpf.actor.util.MJICopier;
-import gov.nasa.jpf.vm.ChoiceGenerator;
-import gov.nasa.jpf.vm.IntChoiceGenerator;
-import gov.nasa.jpf.vm.JPF_java_lang_Thread;
-import gov.nasa.jpf.vm.MJIEnv;
-import gov.nasa.jpf.vm.SystemState;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.ThreadList;
-import gov.nasa.jpf.vm.choice.IntIntervalGenerator;
-import gov.nasa.jpf.vm.choice.ThreadChoiceFromSet;
+import gov.nasa.jpf.jvm.ChoiceGenerator;
+import gov.nasa.jpf.jvm.IntChoiceGenerator;
+import gov.nasa.jpf.jvm.JPF_java_lang_Thread;
+import gov.nasa.jpf.jvm.MJIEnv;
+import gov.nasa.jpf.jvm.SystemState;
+import gov.nasa.jpf.jvm.ThreadInfo;
+import gov.nasa.jpf.jvm.ThreadList;
+import gov.nasa.jpf.jvm.choice.IntIntervalGenerator;
+import gov.nasa.jpf.jvm.choice.ThreadChoiceFromSet;
 
 //import gov.nasa.jpf.jvm.abstraction.filter.ActorFilteringSerializer;
 
@@ -200,7 +200,7 @@ public class JPF_gov_nasa_jpf_actor_core_Util {
    *******************************************************/
   public static void startThreadInInterruptedStatus(MJIEnv env, int rcls,
                                                     int threadRef) {
-    new JPF_java_lang_Thread().start____V(env, threadRef);
+    JPF_java_lang_Thread.start____V(env, threadRef);
 
     ThreadInfo newThread = env.getVM().getThreadList().locate(threadRef);
     newThread.setState(ThreadInfo.State.INTERRUPTED);
@@ -211,10 +211,10 @@ public class JPF_gov_nasa_jpf_actor_core_Util {
   }
 
   /***********************************************************/
-  /*public static void yieldToPlatform____V(MJIEnv env, int rcls) {
-    ThreadInfo mainThread = new ThreadInfo().getMainThread();
+  public static void yieldToPlatform____V(MJIEnv env, int rcls) {
+    ThreadInfo mainThread = ThreadInfo.getMainThread();
     yieldTo(env, mainThread);
-  }*/
+  }
 
   /***********************************************************/
   public static void yieldTo__Ljava_lang_Object_2__V(MJIEnv env, int rcls,
@@ -538,7 +538,7 @@ public class JPF_gov_nasa_jpf_actor_core_Util {
   }
 
   /***********************************************************/
-  /*public static void unsuspendPlatformThread____V(MJIEnv env, int rcls) {
+  public static void unsuspendPlatformThread____V(MJIEnv env, int rcls) {
     ThreadInfo platformThread = ThreadInfo.getMainThread();
 
     ThreadInfo current = ThreadInfo.getCurrentThread();
@@ -548,7 +548,7 @@ public class JPF_gov_nasa_jpf_actor_core_Util {
         platformThread.setState(ThreadInfo.State.RUNNING);
       }
     }
-  }*/
+  }
 
   /***********************************************************/
   public static boolean isUsingActorStateSerializer(MJIEnv env, int rcls) {

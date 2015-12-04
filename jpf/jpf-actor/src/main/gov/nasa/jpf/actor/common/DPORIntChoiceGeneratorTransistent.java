@@ -19,7 +19,7 @@
 package gov.nasa.jpf.actor.common;
 
 //import gov.nasa.jpf.jvm.IntChoiceGenerator;
-import gov.nasa.jpf.vm.choice.IntIntervalGenerator;
+import gov.nasa.jpf.jvm.choice.IntIntervalGenerator;
 
 import java.util.ArrayList;
 import java.util.Arrays;

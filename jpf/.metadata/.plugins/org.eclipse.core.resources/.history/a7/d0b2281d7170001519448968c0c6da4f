@@ -1,9 +1,0 @@
-# JPF site configuration
-jpf.home = ${user.home}/project/jpf
-
-jpf-core = ${jpf.home}/jpf-core
-jpf-actor = ${jpf.home}/jpf-actor
-
-# ... all your other projects go here
-
-extensions=${jpf-core},${jpf-actor}

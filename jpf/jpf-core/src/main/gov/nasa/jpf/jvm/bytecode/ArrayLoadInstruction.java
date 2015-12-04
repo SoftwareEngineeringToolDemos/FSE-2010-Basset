@@ -1,29 +1,28 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.jvm.bytecode;
 
-import gov.nasa.jpf.vm.ArrayIndexOutOfBoundsExecutiveException;
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.MJIEnv;
-import gov.nasa.jpf.vm.Scheduler;
-import gov.nasa.jpf.vm.StackFrame;
-import gov.nasa.jpf.vm.ThreadInfo;
+import gov.nasa.jpf.jvm.ArrayIndexOutOfBoundsExecutiveException;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.KernelState;
+import gov.nasa.jpf.jvm.SystemState;
+import gov.nasa.jpf.jvm.ThreadInfo;
 
 
 /**
@@ -31,46 +30,40 @@ import gov.nasa.jpf.vm.ThreadInfo;
  *
  * ..., array, index => ..., value
  */
-public abstract class ArrayLoadInstruction extends JVMArrayElementInstruction implements JVMInstruction {
+public abstract class ArrayLoadInstruction extends ArrayInstruction {
   
-  @Override
-  public Instruction execute (ThreadInfo ti) {
-    StackFrame frame = ti.getModifiableTopFrame();
+  public Instruction execute (SystemState ss, KernelState ks, ThreadInfo ti) {
 
-    index = frame.peek();
-    arrayRef = frame.peek(1); // ..,arrayRef,idx
-    if (arrayRef == MJIEnv.NULL) {
+    // we need to get the object first, to check if it is shared
+    int aref = ti.peek(1); // ..,arrayRef,idx
+    if (aref == -1) {
       return ti.createAndThrowException("java.lang.NullPointerException");
     }
-    ElementInfo eiArray = ti.getElementInfo(arrayRef);
+    ElementInfo e = ti.getElementInfo(aref);
 
-    indexOperandAttr = peekIndexAttr(ti);
-    arrayOperandAttr = peekArrayAttr(ti);
-
-    Scheduler scheduler = ti.getScheduler();
-    if (scheduler.canHaveSharedArrayCG( ti, this, eiArray, index)){ // don't modify the frame before this
-      eiArray = scheduler.updateArraySharedness(ti, eiArray, index);
-      if (scheduler.setsSharedArrayCG( ti, this, eiArray, index)){
+    if (isNewPorBoundary(e, ti)) {
+      if (createAndSetArrayCG(ss,e,ti, aref,peekIndex(ti),true)) {
         return this;
       }
     }
     
-    frame.pop(2); // now we can pop index and array reference
+    index = ti.pop();
+
+    // we should not set 'arrayRef' before the CG check
+    // (this would kill the CG loop optimization)
+    arrayRef = ti.pop();
     
     try {
-      push(frame, eiArray, index);
+      push(ti, e, index);
 
-      Object elementAttr = eiArray.getElementAttr(index);
-      if (elementAttr != null) {
-        if (getElementSize() == 1) {
-          frame.setOperandAttr(elementAttr);
-        } else {
-          frame.setLongOperandAttr(elementAttr);
-        }
+      Object attr = e.getElementAttr(index);
+      if (getElementSize() == 1){
+        ti.setOperandAttrNoClone(attr);
+      } else {
+        ti.setLongOperandAttrNoClone(attr);
       }
       
       return getNext(ti);
-      
     } catch (ArrayIndexOutOfBoundsExecutiveException ex) {
       return ex.getInstruction();
     }
@@ -83,39 +76,24 @@ public abstract class ArrayLoadInstruction extends JVMArrayElementInstruction im
   /**
    * only makes sense pre-exec
    */
-  @Override
-  public int peekArrayRef (ThreadInfo ti){
-    return ti.getTopFrame().peek(1);
-  }
-
-  @Override
-  public Object peekArrayAttr (ThreadInfo ti){
-    return ti.getTopFrame().getOperandAttr(1);
+  protected int peekArrayRef (ThreadInfo ti){
+    return ti.peek(1);
   }
 
   // wouldn't really be required for loads, but this is a general
   // ArrayInstruction API
-  @Override
-  public int peekIndex (ThreadInfo ti){
-    return ti.getTopFrame().peek();
+  protected int peekIndex (ThreadInfo ti){
+    return ti.peek();
   }
 
-  @Override
-  public Object peekIndexAttr (ThreadInfo ti){
-    return ti.getTopFrame().getOperandAttr();
-  }
-
-  protected abstract void push (StackFrame frame, ElementInfo e, int index)
+  protected abstract void push (ThreadInfo th, ElementInfo e, int index)
                 throws ArrayIndexOutOfBoundsExecutiveException;
 
-  
-  @Override
   public boolean isRead() {
     return true;
   }
   
-  @Override
-  public void accept(JVMInstructionVisitor insVisitor) {
+  public void accept(InstructionVisitor insVisitor) {
 	  insVisitor.visit(this);
   }
  }

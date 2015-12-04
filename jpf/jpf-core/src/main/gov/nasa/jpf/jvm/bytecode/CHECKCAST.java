@@ -1,37 +1,37 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.jvm.bytecode;
 
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.LoadOnJPFRequired;
-import gov.nasa.jpf.vm.MJIEnv;
-import gov.nasa.jpf.vm.StackFrame;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.Types;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.KernelState;
+import gov.nasa.jpf.jvm.MJIEnv;
+import gov.nasa.jpf.jvm.SystemState;
+import gov.nasa.jpf.jvm.ThreadInfo;
+import gov.nasa.jpf.jvm.Types;
 
 
 /**
  * Check whether object is of given type
  * ..., objectref => ..., objectref
  */
-public class CHECKCAST extends Instruction implements JVMInstruction {
+public class CHECKCAST extends Instruction {
   String type;
 
   public CHECKCAST() {} // this is going away
@@ -44,33 +44,14 @@ public class CHECKCAST extends Instruction implements JVMInstruction {
     return type;
   }
 
-  @Override
-  public Instruction execute (ThreadInfo ti) {
-    StackFrame frame = ti.getTopFrame();
-    int objref = frame.peek();
+  public Instruction execute (SystemState ss, KernelState ks, ThreadInfo ti) {
+    int objref = ti.peek();
 
     if (objref == MJIEnv.NULL) {
        // we can cast 'null' to anything
 
     } else {
       boolean isValid = false;
-
-      if(Types.isReferenceSignature(type)) {
-        String t;
-        if(Types.isArray(type)) {
-          // retrieve the component terminal
-          t = Types.getComponentTerminal(type);
-        } else {
-          t = type;
-        }
-
-        // resolve the referenced class
-        try {
-          ti.resolveReferencedClass(t);
-        } catch(LoadOnJPFRequired lre) {
-          return ti.getPC();
-        }
-      }
 
       ElementInfo e = ti.getElementInfo(objref);
       ClassInfo eci = e.getClassInfo();
@@ -96,18 +77,15 @@ public class CHECKCAST extends Instruction implements JVMInstruction {
   }
 
 
-  @Override
   public int getLength() {
     return 3; // opcode, index1, index2
   }
   
-  @Override
   public int getByteCode () {
     return 0xC0;
   }
   
-  @Override
-  public void accept(JVMInstructionVisitor insVisitor) {
+  public void accept(InstructionVisitor insVisitor) {
 	  insVisitor.visit(this);
   }
 }

@@ -1,30 +1,30 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2011 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.test.mc.basic;
 
 import gov.nasa.jpf.ListenerAdapter;
-import gov.nasa.jpf.jvm.bytecode.JVMLocalVariableInstruction;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.LocalVarInfo;
+import gov.nasa.jpf.jvm.MethodInfo;
+import gov.nasa.jpf.jvm.bytecode.Instruction;
+import gov.nasa.jpf.jvm.bytecode.LocalVariableInstruction;
 import gov.nasa.jpf.util.test.TestJPF;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.LocalVarInfo;
-import gov.nasa.jpf.vm.MethodInfo;
 
 import java.util.ArrayList;
 
@@ -45,9 +45,9 @@ public class LocalVarInfoTest extends TestJPF {
     public TestLookupListener(){
       log = new ArrayList<String>();
     }
-
-    @Override
-    public void methodEntered (VM vm, ThreadInfo ti, MethodInfo mi){
+    
+    public void methodEntered (JVM vm){
+      MethodInfo mi = vm.getLastMethodInfo();
       if (mi.getUniqueName().equals("testLookup()V")){
         logMethod = mi;
         System.out.println("---- " + mi.getUniqueName() + " entered");
@@ -61,24 +61,24 @@ public class LocalVarInfoTest extends TestJPF {
         assertTrue( lvs.length == 3);
       }
     }
-
-    @Override
-    public void methodExited (VM vm, ThreadInfo ti, MethodInfo mi){
+    
+    public void methodExited (JVM vm){
+      MethodInfo mi = vm.getLastMethodInfo();
       if (mi == logMethod){
         logMethod = null;
       }      
     }
-
-    @Override
-    public void instructionExecuted(VM vm, ThreadInfo ti, Instruction nextInsn, Instruction executedInsn){
-      if (executedInsn.getMethodInfo() == logMethod){
-        System.out.printf(" %2d: %s", executedInsn.getPosition(), executedInsn);
-        if (executedInsn instanceof JVMLocalVariableInstruction){
-          JVMLocalVariableInstruction lvinsn = (JVMLocalVariableInstruction)executedInsn;
+    
+    public void instructionExecuted(JVM vm){
+      Instruction insn = vm.getLastInstruction();
+      if (insn.getMethodInfo() == logMethod){
+        System.out.printf(" %2d: %s", insn.getPosition(), insn);
+        if (insn instanceof LocalVariableInstruction){
+          LocalVariableInstruction lvinsn = (LocalVariableInstruction)insn;
           LocalVarInfo lv = lvinsn.getLocalVarInfo(); 
           System.out.print(" : " + lv);
 
-          log.add( executedInsn.getClass().getSimpleName() + " " + lv.getName());
+          log.add( insn.getClass().getSimpleName() + " " + lv.getName());
         }
         System.out.println();
       }

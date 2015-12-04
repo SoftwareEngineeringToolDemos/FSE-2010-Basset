@@ -1,9 +1,0 @@
-Testsuite: gov.nasa.jpf.util.json.JSONLexerTest
-Tests run: 6, Failures: 0, Errors: 0, Time elapsed: 0.019 sec
-
-Testcase: testKeyIdObjectWithEscapes took 0.003 sec
-Testcase: testArrayTokens took 0 sec
-Testcase: testEmptyObject took 0 sec
-Testcase: testCGCallTokens took 0 sec
-Testcase: testKeyIdObject took 0 sec
-Testcase: testKeyIdObjectWithNumbers took 0 sec

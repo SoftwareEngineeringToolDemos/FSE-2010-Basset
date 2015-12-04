@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 //import gov.nasa.jpf.jvm.IntChoiceGenerator;
-import gov.nasa.jpf.vm.choice.IntIntervalGenerator;
+import gov.nasa.jpf.jvm.choice.IntIntervalGenerator;
 
 /**
  * Choice Generator that returns integer values that correspond to messages that

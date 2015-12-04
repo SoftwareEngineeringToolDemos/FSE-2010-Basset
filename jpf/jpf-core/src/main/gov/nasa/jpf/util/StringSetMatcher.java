@@ -1,20 +1,21 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2007 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.util;
 
 import java.util.regex.Matcher;
@@ -22,23 +23,18 @@ import java.util.regex.Pattern;
 
 /**
  * simple utility that can be used to check for string matches in
- * sets with '*' wildcards, e.g. to check for class name lists such as
+ * sets with '*' wildcards, e.g. to check for class name lists like
  *
  *   vm.halt_on_throw=java.lang.reflect.*:my.own.Exception
  *
- * Only meta chars in patterns are '*' and '!', i.e. '.' is a regular char to match
- * A '!' prefix inverts the match
+ * Only meta chars in patterns are '*', i.e. '.' is a regular char to match
  */
 public class StringSetMatcher {
 
-  public static final char WILDCARD = '*';
-  public static final char INVERTED = '!';
-  
   boolean hasAnyPattern; // do we have a universal '*' pattern?
 
   Pattern[] pattern;
   Matcher[] matcher;
-  boolean[] inverted;
 
   /**
    * convenience method for matcher pairs containing of explicit excludes and
@@ -72,7 +68,6 @@ public class StringSetMatcher {
     int n = set.length;
     pattern = new Pattern[n];
     matcher = new Matcher[n];
-    inverted = new boolean[n];
 
     for (int i=0; i<n; i++){
       String s = set[i];
@@ -85,16 +80,14 @@ public class StringSetMatcher {
         Pattern p =  createPattern(s);
         pattern[i] = p;
         matcher[i] = p.matcher(""); // gets reset upon use
-        inverted[i] = isInverted(s);
       }
     }
   }
 
-  @Override
   public String toString() {
     int n=0;
     StringBuilder sb = new StringBuilder(64);
-    sb.append("StringSetMatcher {patterns=");
+    sb.append("StringSetMatcher [regex_patterns=");
 
     if (hasAnyPattern) {
       sb.append(".*");
@@ -106,20 +99,16 @@ public class StringSetMatcher {
         if (n++>0) {
           sb.append(',');
         }
-        if (inverted[i]){
-          sb.append(INVERTED);
-        }
         sb.append(pattern[i]);
       }
     }
-    sb.append('}');
+    sb.append(']');
     return sb.toString();
   }
 
   public void addPattern (String s){
 
     if (s.equals("*")) { // no need to compile
-      // note that this doesn't include the - pointless - "!*", which would match nothing
       hasAnyPattern = true;
 
     } else {
@@ -133,33 +122,18 @@ public class StringSetMatcher {
       System.arraycopy(matcher, 0, mNew, 0, n);
       mNew[n] = pNew[n].matcher("");
 
-      boolean[] iNew = new boolean[pNew.length];
-      System.arraycopy( inverted, 0, iNew, 0, n);
-      iNew[n] = isInverted(s);
-      
       pattern = pNew;
       matcher = mNew;
-      inverted = iNew;
     }
   }
 
-  public static boolean isInverted (String s){
-    return (!s.isEmpty() && s.charAt(0) == INVERTED);
-  }
-  
-  protected Pattern createPattern (String s){
+  Pattern createPattern (String s){
     Pattern p;
-    int j = 0;
-    int len = s.length();
 
-    // inversion is better done outside of regex
-    if ((len > 0) && s.charAt(0) == INVERTED){
-      j++; // skip INVERTED char
-    }
-    
     StringBuilder sb = new StringBuilder();
-        
-    for (; j<len; j++){
+
+    int len = s.length();
+    for (int j=0; j<len; j++){
       char c = s.charAt(j);
       switch (c){
       case '.' : sb.append("\\."); break;
@@ -191,7 +165,7 @@ public class StringSetMatcher {
         Matcher m = matcher[i];
         m.reset(s);
 
-        if (m.matches() != inverted[i]){
+        if (m.matches()){
           return true;
         }
       }
@@ -205,23 +179,17 @@ public class StringSetMatcher {
    */
   public boolean matchesAll (String s){
     if (s != null) {
-      if (hasAnyPattern && pattern.length == 1) { // there might be other patterns
+      if (hasAnyPattern && pattern.length == 1) {
         return true; // no need to check
       }
 
       for (int i=0; i<pattern.length; i++){
         Pattern p = pattern[i];
-        if (p != null){
-          Matcher m = matcher[i];
-          m.reset(s);
+        Matcher m = matcher[i];
+        m.reset(s);
 
-          if (m.matches() == inverted[i]){
-            return false;
-          }
-        } else {
-          if (inverted[i]){
-            return false;
-          }
+        if (!m.matches()){
+          return false;
         }
       }
 

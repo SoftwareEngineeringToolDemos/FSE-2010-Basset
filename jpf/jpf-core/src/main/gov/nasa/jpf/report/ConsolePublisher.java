@@ -1,33 +1,34 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.report;
 
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.Error;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.MethodInfo;
+import gov.nasa.jpf.jvm.Path;
+import gov.nasa.jpf.jvm.Step;
+import gov.nasa.jpf.jvm.Transition;
+import gov.nasa.jpf.jvm.bytecode.Instruction;
 import gov.nasa.jpf.util.Left;
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.ClassLoaderInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.MethodInfo;
-import gov.nasa.jpf.vm.Path;
-import gov.nasa.jpf.vm.Step;
-import gov.nasa.jpf.vm.Transition;
+import gov.nasa.jpf.util.RepositoryEntry;
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -46,12 +47,12 @@ public class ConsolePublisher extends Publisher {
   String port;
 
   // the various degrees of information for program traces
-  protected boolean showCG;
-  protected boolean showSteps;
-  protected boolean showLocation;
-  protected boolean showSource;
-  protected boolean showMethod;
-  protected boolean showCode;
+  boolean showCG;
+  boolean showSteps;
+  boolean showLocation;
+  boolean showSource;
+  boolean showMethod;
+  boolean showCode;
 
   public ConsolePublisher(Config conf, Reporter reporter) {
     super(conf, reporter);
@@ -69,12 +70,10 @@ public class ConsolePublisher extends Publisher {
     showCode = conf.getBoolean("report.console.show_code", false);
   }
 
-  @Override
   public String getName() {
     return "console";
   }
 
-  @Override
   protected void openChannel(){
 
     if (fileName != null) {
@@ -93,60 +92,51 @@ public class ConsolePublisher extends Publisher {
     }
   }
 
-  @Override
   protected void closeChannel() {
     if (fos != null){
       out.close();
     }
   }
 
-  @Override
   public void publishTopicStart (String topic) {
     out.println();
     out.print("====================================================== ");
     out.println(topic);
   }
 
-  @Override
   public void publishTopicEnd (String topic) {
     // nothing here
   }
 
-  @Override
   public void publishStart() {
     super.publishStart();
 
-    if (startItems.length > 0){ // only report if we have output for this phase
+    if (startTopics.length > 0){ // only report if we have output for this phase
       publishTopicStart("search started: " + formatDTG(reporter.getStartDate()));
     }
   }
 
-  @Override
   public void publishFinished() {
     super.publishFinished();
 
-    if (finishedItems.length > 0){ // only report if we have output for this phase
+    if (finishedTopics.length > 0){ // only report if we have output for this phase
       publishTopicStart("search finished: " + formatDTG(reporter.getFinishedDate()));
     }
   }
 
-  @Override
   protected void publishJPF() {
     out.println(reporter.getJPFBanner());
     out.println();
   }
 
-  @Override
   protected void publishDTG() {
     out.println("started: " + reporter.getStartDate());
   }
 
-  @Override
   protected void publishUser() {
     out.println("user: " + reporter.getUser());
   }
 
-  @Override
   protected void publishJPFConfig() {
     publishTopicStart("JPF configuration");
 
@@ -164,7 +154,6 @@ public class ConsolePublisher extends Publisher {
     }
   }
 
-  @Override
   protected void publishPlatform() {
     publishTopicStart("platform");
     out.println("hostname: " + reporter.getHostName());
@@ -174,17 +163,42 @@ public class ConsolePublisher extends Publisher {
   }
 
 
-  @Override
   protected void publishSuT() {
     publishTopicStart("system under test");
-    out.println( reporter.getSuT());
+
+    String mainCls = conf.getTarget();
+    if (mainCls != null) {
+      String mainPath = reporter.getSuT();
+      if (mainPath != null) {
+        out.println("application: " + mainPath);
+
+        RepositoryEntry rep = RepositoryEntry.getRepositoryEntry(mainPath);
+        if (rep != null) {
+          out.println("repository: " + rep.getRepository());
+          out.println("revision: " + rep.getRevision());
+        }
+      } else {
+        out.println("application: " + mainCls + ".class");
+      }
+    } else {
+      out.println("application: ?");
+    }
+
+    String[] args = conf.getTargetArgs();
+    if (args.length > 0) {
+      out.print("arguments:   ");
+      for (String s : args) {
+        out.print(s);
+        out.print(' ');
+      }
+      out.println();
+    }
   }
 
-  @Override
   protected void publishError() {
-    Error e = reporter.getCurrentError();
+    Error e = reporter.getLastError();
 
-    publishTopicStart("error " + e.getId());
+    publishTopicStart("error " + reporter.getLastErrorId());
     out.println(e.getDescription());
 
     String s = e.getDetails();
@@ -194,14 +208,12 @@ public class ConsolePublisher extends Publisher {
 
   }
 
-  @Override
   protected void publishConstraint() {
     String constraint = reporter.getLastSearchConstraint();
     publishTopicStart("search constraint");
     out.println(constraint);  // not much info here yet
   }
 
-  @Override
   protected void publishResult() {
     List<Error> errors = reporter.getErrors();
 
@@ -240,7 +252,6 @@ public class ConsolePublisher extends Publisher {
    * this is done as part of the property violation reporting, i.e.
    * we have an error
    */
-  @Override
   protected void publishTrace() {
     Path path = reporter.getPath();
     int i=0;
@@ -249,7 +260,7 @@ public class ConsolePublisher extends Publisher {
       return; // nothing to publish
     }
 
-    publishTopicStart("trace " + reporter.getCurrentErrorId());
+    publishTopicStart("trace " + reporter.getLastErrorId());
 
     for (Transition t : path) {
       out.print("------------------------------------------------------ ");
@@ -316,7 +327,6 @@ public class ConsolePublisher extends Publisher {
     }
   }
 
-  @Override
   protected void publishOutput() {
     Path path = reporter.getPath();
 
@@ -324,7 +334,7 @@ public class ConsolePublisher extends Publisher {
       return; // nothing to publish
     }
 
-    publishTopicStart("output " + reporter.getCurrentErrorId());
+    publishTopicStart("output " + reporter.getLastErrorId());
 
     if (path.hasOutput()) {
       for (Transition t : path) {
@@ -338,13 +348,12 @@ public class ConsolePublisher extends Publisher {
     }
   }
 
-  @Override
   protected void publishSnapshot() {
-    VM vm = reporter.getVM();
+    JVM vm = reporter.getVM();
 
     // not so nice - we have to delegate this since it's using a lot of internals, and is also
     // used in debugging
-    publishTopicStart("snapshot " + reporter.getCurrentErrorId());
+    publishTopicStart("snapshot " + reporter.getLastErrorId());
 
     if (vm.getPathLength() > 0) {
       vm.printLiveThreadStatus(out);
@@ -357,34 +366,27 @@ public class ConsolePublisher extends Publisher {
   
   // this is useful if somebody wants to monitor progress from a specialized ConsolePublisher
   public synchronized void printStatistics (PrintWriter pw){
-    publishTopicStart( STATISTICS_TOPIC);
-    printStatistics( pw, reporter);
-  }
-  
-  // this can be used outside a publisher, to show the same info
-  public static void printStatistics (PrintWriter pw, Reporter reporter){
     Statistics stat = reporter.getStatistics();
-
+    publishTopicStart( STATISTICS_TOPIC);
+    
     pw.println("elapsed time:       " + formatHMS(reporter.getElapsedTime()));
-    pw.println("states:             new=" + stat.newStates + ",visited=" + stat.visitedStates
-            + ",backtracked=" + stat.backtracked + ",end=" + stat.endStates);
-    pw.println("search:             maxDepth=" + stat.maxDepth + ",constraints=" + stat.constraints);
+    pw.println("states:             new=" + stat.newStates + ", visited=" + stat.visitedStates
+            + ", backtracked=" + stat.backtracked + ", end=" + stat.endStates);
+    pw.println("search:             maxDepth=" + stat.maxDepth + ", constraints hit=" + stat.constraints);
     pw.println("choice generators:  thread=" + stat.threadCGs
-            + " (signal=" + stat.signalCGs + ",lock=" + stat.monitorCGs + ",sharedRef=" + stat.sharedAccessCGs
-            + ",threadApi=" + stat.threadApiCGs + ",reschedule=" + stat.breakTransitionCGs
+            + " (signal=" + stat.signalCGs + ", lock=" + stat.monitorCGs + ", shared ref=" + stat.sharedAccessCGs
             + "), data=" + stat.dataCGs);
     pw.println("heap:               " + "new=" + stat.nNewObjects
-            + ",released=" + stat.nReleasedObjects
-            + ",maxLive=" + stat.maxLiveObjects
-            + ",gcCycles=" + stat.gcCycles);
+            + ", released=" + stat.nReleasedObjects
+            + ", max live=" + stat.maxLiveObjects
+            + ", gc-cycles=" + stat.gcCycles);
     pw.println("instructions:       " + stat.insns);
     pw.println("max memory:         " + (stat.maxUsed >> 20) + "MB");
 
-    pw.println("loaded code:        classes=" + ClassLoaderInfo.getNumberOfLoadedClasses() + ",methods="
-            + MethodInfo.getNumberOfLoadedMethods());
+    pw.println("loaded code:        classes=" + ClassInfo.getNumberOfLoadedClasses() + ", methods="
+            + MethodInfo.getNumberOfLoadedMethods());    
   }
   
-  @Override
   public void publishStatistics() {
     printStatistics(out);
   }

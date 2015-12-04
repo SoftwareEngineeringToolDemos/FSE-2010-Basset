@@ -1,34 +1,35 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2007 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.listener;
 
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.JPF;
 import gov.nasa.jpf.ListenerAdapter;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.StackFrame;
+import gov.nasa.jpf.jvm.ThreadInfo;
 import gov.nasa.jpf.jvm.bytecode.EXECUTENATIVE;
+import gov.nasa.jpf.jvm.bytecode.Instruction;
 import gov.nasa.jpf.report.ConsolePublisher;
 import gov.nasa.jpf.report.Publisher;
 import gov.nasa.jpf.search.Search;
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.StackFrame;
-import gov.nasa.jpf.vm.ThreadInfo;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -69,9 +70,9 @@ public class DeadlockAnalyzer extends ListenerAdapter {
     ThreadOp prevTransition;
     ThreadOp prevOp;
 
-    ThreadOp (ThreadInfo ti, ElementInfo ei, OpType type) {
-      this.ti = ti;
-      this.ei = ei;
+    ThreadOp (JVM vm, OpType type) {
+      ti = vm.getLastThreadInfo();
+      ei = vm.getLastElementInfo();
       insn = getReportInsn(ti); // we haven't had the executeInsn notification yet
       opType = type;
       
@@ -120,8 +121,7 @@ public class DeadlockAnalyzer extends ListenerAdapter {
       pw.println(ei);
     }
     
-    @Override
-	public String toString() {
+    public String toString() {
       StringBuilder sb = new StringBuilder();
       sb.append( stateId);
       sb.append( " : ");
@@ -139,7 +139,7 @@ public class DeadlockAnalyzer extends ListenerAdapter {
           if (opType == OpType.started || opType == OpType.terminated) {
             pw.print(String.format("   %1$s    ", opTypeMnemonic[opType.ordinal()]));
           } else {
-            pw.print(String.format("%1$s:%2$-5x ", opTypeMnemonic[opType.ordinal()], ei.getObjectRef()));
+            pw.print(String.format("%1$s:%2$-5d ", opTypeMnemonic[opType.ordinal()], ei.getObjectRef()));
           }
           //break;
         } else {
@@ -155,7 +155,7 @@ public class DeadlockAnalyzer extends ListenerAdapter {
   int maxHistory;
   String format;
   
-  VM vm;
+  JVM vm;
   Search search;
   
   public DeadlockAnalyzer (Config config, JPF jpf){
@@ -172,8 +172,8 @@ public class DeadlockAnalyzer extends ListenerAdapter {
     return (format.equalsIgnoreCase("essential"));
   }
   
-  void addOp (ThreadInfo ti, ElementInfo ei, OpType opType){
-    ThreadOp op = new ThreadOp(ti, ei, opType);
+  void addOp (JVM vm, OpType opType){
+    ThreadOp op = new ThreadOp(vm, opType);
     if (lastOp == null){
       lastOp = op;
     } else {
@@ -428,56 +428,46 @@ public class DeadlockAnalyzer extends ListenerAdapter {
 
   //--- VM listener interface
   
-  @Override
-  public void objectLocked (VM vm, ThreadInfo ti, ElementInfo ei) {
-    addOp(ti, ei, OpType.lock);
+  public void objectLocked (JVM vm) {
+    addOp(vm,OpType.lock);
   }
 
-  @Override
-  public void objectUnlocked (VM vm, ThreadInfo ti, ElementInfo ei) {
-    addOp(ti, ei, OpType.unlock);
+  public void objectUnlocked (JVM vm) {
+    addOp(vm,OpType.unlock);
   }
 
-  @Override
-  public void objectWait (VM vm, ThreadInfo ti, ElementInfo ei) {
-    addOp(ti, ei, OpType.wait);
+  public void objectWait (JVM vm) {
+    addOp(vm,OpType.wait);
   }
 
-  @Override
-  public void objectNotify (VM vm, ThreadInfo ti, ElementInfo ei) {
-    addOp(ti, ei, OpType.notify);
+  public void objectNotify (JVM vm) {
+    addOp(vm,OpType.notify);
   }
 
-  @Override
-  public void objectNotifyAll (VM vm, ThreadInfo ti, ElementInfo ei) {
-    addOp(ti, ei, OpType.notifyAll);
+  public void objectNotifyAll (JVM vm) {
+    addOp(vm,OpType.notifyAll);
   }
 
-  @Override
-  public void threadBlocked (VM vm, ThreadInfo ti, ElementInfo ei){
-    addOp(ti, ei, OpType.block);
+  public void threadBlocked (JVM vm){
+    addOp(vm,OpType.block);
   }
   
-  @Override
-  public void threadStarted (VM vm, ThreadInfo ti){
-    addOp(ti, null, OpType.started);    
+  public void threadStarted (JVM vm){
+    addOp(vm,OpType.started);    
   }
   
-  @Override
-  public void threadTerminated (VM vm, ThreadInfo ti){
-    addOp(ti, null, OpType.terminated);
+  public void threadTerminated (JVM vm){
+    addOp(vm,OpType.terminated);
   }
   
   //--- SearchListener interface
 
-  @Override
   public void stateAdvanced (Search search){
     if (search.isNewState()) {
       storeLastTransition();
     }
   }
 
-  @Override
   public void stateBacktracked (Search search){
     int stateId = search.getStateId();
     while ((lastTransition != null) && (lastTransition.stateId > stateId)){
@@ -489,13 +479,11 @@ public class DeadlockAnalyzer extends ListenerAdapter {
   // for HeuristicSearches. Ok, that's braindead but at least no need for cloning
   HashMap<Integer,ThreadOp> storedTransition = new HashMap<Integer,ThreadOp>();
   
-  @Override
   public void stateStored (Search search) {
     // always called after stateAdvanced
     storedTransition.put(search.getStateId(), lastTransition);
   }
   
-  @Override
   public void stateRestored (Search search) {
     int stateId = search.getStateId();
     ThreadOp op = storedTransition.get(stateId);
@@ -505,7 +493,7 @@ public class DeadlockAnalyzer extends ListenerAdapter {
     }
   }
   
-  @Override
+  
   public void publishPropertyViolation (Publisher publisher) {
     PrintWriter pw = publisher.getOut();
     publisher.publishTopicStart("thread ops " + publisher.getLastErrorId());

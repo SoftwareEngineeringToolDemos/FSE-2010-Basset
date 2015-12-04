@@ -1,31 +1,31 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
-
+//
+// Copyright (C) 2007 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.listener;
 
 import gov.nasa.jpf.JPF;
 import gov.nasa.jpf.ListenerAdapter;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.ThreadInfo;
 import gov.nasa.jpf.search.DFSearch;
 import gov.nasa.jpf.search.Search;
 import gov.nasa.jpf.search.heuristic.BFSHeuristic;
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.ThreadInfo;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -101,13 +101,14 @@ public class LockedStackDepth extends ListenerAdapter
       return(result);
    }
 
-   @Override
-   public void objectLocked(VM vm, ThreadInfo thread, ElementInfo ei)
+   public void objectLocked(JVM vm)
    {
+      ThreadInfo thread;
       ElementInfo lock;
       Integer depth;
 
-      lock   = ei;
+      lock   = vm.getLastElementInfo();
+      thread = vm.getLastThreadInfo();
 
       logStack(thread);
 
@@ -129,15 +130,17 @@ public class LockedStackDepth extends ListenerAdapter
       new Operation(lock, depth);
    }
 
-   @Override
-   public void objectUnlocked(VM vm, ThreadInfo thread, ElementInfo ei)
+   public void objectUnlocked(JVM vm)
    {
+      ThreadInfo thread;
       ElementInfo lock;
       Integer depth;
 
+      thread = vm.getLastThreadInfo();
+
       logStack(thread);
 
-      lock   = ei;
+      lock   = vm.getLastElementInfo();
       depth  = new Operation(lock, null).getOldDepth();
 
       assert !m_state.containsKey(makeKey(lock));
@@ -161,7 +164,6 @@ public class LockedStackDepth extends ListenerAdapter
       }
    }
 
-   @Override
    public void searchStarted(Search search)
    {
       m_operations.clear();
@@ -170,7 +172,6 @@ public class LockedStackDepth extends ListenerAdapter
       m_current = null;
    }
 
-   @Override
    public void stateAdvanced(Search search)
    {
       Integer id;
@@ -186,7 +187,6 @@ public class LockedStackDepth extends ListenerAdapter
       logState();
    }
 
-   @Override
    public void stateProcessed(Search search)
    {
       Integer id;
@@ -203,13 +203,11 @@ public class LockedStackDepth extends ListenerAdapter
          s_logger.fine("State Processed: " + id);
    }
 
-   @Override
    public void stateBacktracked(Search search)
    {
       switchTo(search);
    }
 
-   @Override
    public void stateRestored(Search search)
    {
       switchTo(search);

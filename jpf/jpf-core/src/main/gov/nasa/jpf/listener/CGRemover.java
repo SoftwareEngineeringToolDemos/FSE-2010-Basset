@@ -1,36 +1,36 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2010 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 
 package gov.nasa.jpf.listener;
 
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.JPF;
 import gov.nasa.jpf.ListenerAdapter;
-import gov.nasa.jpf.jvm.bytecode.JVMInvokeInstruction;
+import gov.nasa.jpf.jvm.ChoiceGenerator;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.MethodInfo;
+import gov.nasa.jpf.jvm.bytecode.Instruction;
+import gov.nasa.jpf.jvm.bytecode.InvokeInstruction;
 import gov.nasa.jpf.util.JPFLogger;
 import gov.nasa.jpf.util.LocationSpec;
 import gov.nasa.jpf.util.MethodSpec;
-import gov.nasa.jpf.vm.ChoiceGenerator;
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.MethodInfo;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -46,7 +46,7 @@ import java.util.List;
  * still add new CGs after they got removed here. THIS IS ONLY AN OPTIMIZATION
  * TOOL THAT SHOULD BE USED IN A WELL KNOWN APPLICATION CONTEXT.
  *
- *  cgrm.thread.cg_class = gov.nasa.jpf.vm.ThreadChoiceGenerator
+ *  cgrm.thread.cg_class = gov.nasa.jpf.jvm.ThreadChoiceGenerator
  *  cgrm.thread.locations = Foobar.java:42                // either a LocationSpec
  *  cgrm.thread.method_bodies = a.SomeClass.someMethod()  // ..or a MethodSpec for a body
  *  cgrm.thread.method_calls = b.A.foo(int)               // ..or a MethodSpec for a call
@@ -216,7 +216,7 @@ public class CGRemover extends ListenerAdapter {
     }
   }
 
-  protected boolean removeCG (VM vm, Category cat, ChoiceGenerator<?> cg){
+  protected boolean removeCG (JVM vm, Category cat, ChoiceGenerator<?> cg){
     if (cat != null){
       if (cat.cgClass.isAssignableFrom(cg.getClass())){
         vm.getSystemState().removeNextChoiceGenerator();
@@ -231,16 +231,16 @@ public class CGRemover extends ListenerAdapter {
   //--- VMListener interface
 
   // this is where we turn Categories into MethodInfos and Instructions to watch out for
-  @Override
-  public void classLoaded (VM vm, ClassInfo loadedClass){
+  public void classLoaded (JVM vm){
+    ClassInfo ci = vm.getLastClassInfo();
+
     for (Category cat : categories){
-      processClass(loadedClass, cat);
+      processClass(ci, cat);
     }
   }
 
   // this is our main purpose in life
-  @Override
-  public void choiceGeneratorRegistered (VM vm, ChoiceGenerator<?> nextCG, ThreadInfo ti, Instruction executedInsn){
+  public void choiceGeneratorRegistered (JVM vm){
     ChoiceGenerator<?> cg = vm.getNextChoiceGenerator();
     Instruction insn = cg.getInsn();
 
@@ -250,8 +250,8 @@ public class CGRemover extends ListenerAdapter {
       }
     }
 
-    if (insn instanceof JVMInvokeInstruction){
-      MethodInfo invokedMi = ((JVMInvokeInstruction)insn).getInvokedMethod();
+    if (insn instanceof InvokeInstruction){
+      MethodInfo invokedMi = ((InvokeInstruction)insn).getInvokedMethod();
       if (methodCalls != null) {
         if (removeCG(vm, methodCalls.get(invokedMi), cg)) {
           return;

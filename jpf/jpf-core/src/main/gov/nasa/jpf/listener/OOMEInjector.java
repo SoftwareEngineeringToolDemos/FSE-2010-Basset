@@ -1,20 +1,21 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2012 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 
 package gov.nasa.jpf.listener;
 
@@ -24,18 +25,18 @@ import java.util.List;
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.JPF;
 import gov.nasa.jpf.ListenerAdapter;
-import gov.nasa.jpf.jvm.bytecode.JVMInvokeInstruction;
+import gov.nasa.jpf.jvm.AllocInstruction;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.MJIEnv;
+import gov.nasa.jpf.jvm.MethodInfo;
+import gov.nasa.jpf.jvm.StackFrame;
+import gov.nasa.jpf.jvm.ThreadInfo;
+import gov.nasa.jpf.jvm.bytecode.Instruction;
+import gov.nasa.jpf.jvm.bytecode.InvokeInstruction;
 import gov.nasa.jpf.jvm.bytecode.NEW;
 import gov.nasa.jpf.util.LocationSpec;
 import gov.nasa.jpf.util.TypeSpec;
-import gov.nasa.jpf.vm.bytecode.NewInstruction;
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.MJIEnv;
-import gov.nasa.jpf.vm.MethodInfo;
-import gov.nasa.jpf.vm.StackFrame;
-import gov.nasa.jpf.vm.ThreadInfo;
 
 /**
  * simulator for OutOfMemoryErrors. This can be configured to either
@@ -95,12 +96,13 @@ public class OOMEInjector extends ListenerAdapter {
   }
   
   @Override
-  public void classLoaded (VM vm, ClassInfo loadedClass){
-    String fname = loadedClass.getSourceFileName();
+  public void classLoaded (JVM vm){
+    ClassInfo ci = vm.getLastClassInfo();
+    String fname = ci.getSourceFileName();
     
     for (TypeSpec typeSpec : types){
-      if (typeSpec.matches(loadedClass)){
-        loadedClass.addAttr(throwOOME);
+      if (typeSpec.matches(ci)){
+        ci.addAttr(throwOOME);
       }
     }
 
@@ -108,7 +110,7 @@ public class OOMEInjector extends ListenerAdapter {
     // we also want to cover statis methods of this class
     for (LocationSpec locSpec : locations){
       if (locSpec.matchesFile(fname)){
-        for (MethodInfo mi : loadedClass.getDeclaredMethodInfos()){
+        for (MethodInfo mi : ci.getDeclaredMethodInfos()){
           markMatchingInstructions(mi, locSpec);
         }
       }
@@ -121,9 +123,11 @@ public class OOMEInjector extends ListenerAdapter {
   }
   
   @Override
-  public void executeInstruction (VM vm, ThreadInfo ti, Instruction insnToExecute){
-    if (insnToExecute instanceof NewInstruction){
-      if (checkCallerForOOM(ti.getTopFrame(), insnToExecute)){
+  public void executeInstruction (JVM vm){
+    Instruction insn = vm.getLastInstruction();
+    if (insn instanceof AllocInstruction){
+      ThreadInfo ti = vm.getLastThreadInfo();
+      if (checkCallerForOOM(ti.getTopFrame(), insn)){
         // we could use Heap.setOutOfMemory(true), but then we would have to reset
         // if the app handles it so that it doesn't throw outside the specified locations.
         // This would require more effort than throwing explicitly
@@ -134,23 +138,26 @@ public class OOMEInjector extends ListenerAdapter {
   }
   
   @Override
-  public void instructionExecuted (VM vm, ThreadInfo ti, Instruction insn, Instruction executedInsn){
+  public void instructionExecuted (JVM vm){
+    Instruction insn = vm.getLastInstruction();
     
-    if (executedInsn instanceof JVMInvokeInstruction){
+    if (insn instanceof InvokeInstruction){
+      ThreadInfo ti = vm.getLastThreadInfo();
       StackFrame frame = ti.getTopFrame();
       
-      if (frame.getPC() != executedInsn){ // means the call did succeed
-        if (checkCallerForOOM(frame.getPrevious(), executedInsn)){
+      if (frame.getPC() != insn){ // means the call did succeed
+        if (checkCallerForOOM(frame.getPrevious(), insn)){
           frame.addFrameAttr(throwOOME); // propagate caller OOME context
         }
       }
       
-    } else if (executedInsn instanceof NEW){
+    } else if (insn instanceof NEW){
       if (!types.isEmpty()){
-        int objRef = ((NEW) executedInsn).getNewObjectRef();
+        int objRef = ((NEW) insn).getNewObjectRef();
         if (objRef != MJIEnv.NULL) {
           ClassInfo ci = vm.getClassInfo(objRef);
           if (ci.hasAttr(OOME.class)) {
+            ThreadInfo ti = vm.getLastThreadInfo();
             Instruction nextInsn = ti.createAndThrowException("java.lang.OutOfMemoryError");
             ti.setNextPC(nextInsn);
           }

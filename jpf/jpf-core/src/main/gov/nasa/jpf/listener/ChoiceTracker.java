@@ -1,33 +1,15 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
-
 package gov.nasa.jpf.listener;
 
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.JPF;
 import gov.nasa.jpf.ListenerAdapter;
+import gov.nasa.jpf.jvm.ChoiceGenerator;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.SystemState;
 import gov.nasa.jpf.report.ConsolePublisher;
 import gov.nasa.jpf.report.Publisher;
 import gov.nasa.jpf.report.PublisherExtension;
 import gov.nasa.jpf.search.Search;
-import gov.nasa.jpf.vm.ChoiceGenerator;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.SystemState;
 
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
@@ -41,7 +23,7 @@ public class ChoiceTracker extends ListenerAdapter implements PublisherExtension
   enum Format { CG, CHOICE };
 
   Config config;
-  VM vm;
+  JVM vm;
   Search search;
   
   protected PrintWriter pw;
@@ -114,13 +96,17 @@ public class ChoiceTracker extends ListenerAdapter implements PublisherExtension
     }
   }
 
-  @Override
   public void propertyViolated (Search search) {
         
     if (!isReportExtension) {
 
       pw.print("// application: ");
-      pw.println( search.getVM().getSUTDescription());
+      pw.print(config.getTarget());
+      for (String s : config.getTargetArgs()) {
+        pw.print(s);
+        pw.print(' ');
+      }
+      pw.println();
 
       if (cgClasses == null) {
         pw.println("// trace over all CG classes");
@@ -168,13 +154,13 @@ public class ChoiceTracker extends ListenerAdapter implements PublisherExtension
         switch (format){
           case CHOICE:
             line = choice.toString();
-            if (line.startsWith("gov.nasa.jpf.vm.")){
+            if (line.startsWith("gov.nasa.jpf.jvm.")){
               line = line.substring(17);
             }
             break;
           case CG:
             line = cg.toString();
-            if (line.startsWith("gov.nasa.jpf.vm.choice.")){
+            if (line.startsWith("gov.nasa.jpf.jvm.choice.")){
               line = line.substring(24);
             }
             break;
@@ -201,7 +187,6 @@ public class ChoiceTracker extends ListenerAdapter implements PublisherExtension
 
   //--- the PublisherExtension interface
 
-  @Override
   public void publishPropertyViolation (Publisher publisher) {
     pw = publisher.getOut();
     publisher.publishTopicStart("choice trace " + publisher.getLastErrorId());

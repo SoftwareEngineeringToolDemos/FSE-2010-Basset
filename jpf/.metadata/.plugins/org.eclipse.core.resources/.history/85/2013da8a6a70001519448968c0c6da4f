@@ -1,5 +1,0 @@
-target = gov.nasa.jpf.actor.Basset
-
-target_args = regsim.Driver,4
-
-basset.language = foundry

@@ -1,31 +1,25 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package java.io;
 
-import java.nio.channels.FileChannel;
-
-import java.io.FileDescriptor;
 /**
  * MJI model class for java.io.RandomAccessFile
- * This class cannot yet handle File I/O correctly
- * Some work about the use of RandomAccessFile can be 
- * found here : https://bitbucket.org/pfjeau/jpf_for_nanohttpd/src/8f880ee27410026c69cf37f1904b159965d1576e/?at=raf-progress
- * Another way to implement all the missing features is to fix the jpf-bfs project in order to handle file I/O
  *
  * @author Owen O'Malley
  */
@@ -37,11 +31,6 @@ public class RandomAccessFile {
     isOpen = true;
     isReadOnly = "r".equals(permissions);
     setDataMap();
-  }
-
-  public RandomAccessFile(String name, String permissions
-                         ) throws FileNotFoundException {
-    this(new File(name), permissions);
   }
 
   public void seek(long posn) throws IOException {
@@ -69,14 +58,6 @@ public class RandomAccessFile {
 
   public void close() throws IOException {
     isOpen = false;
-  }
-
-  public FileChannel getChannel(){
-    return null;//TODO
-  }
-
-  public FileDescriptor getFD(){
-    return null;//TODO
   }
 
   private static class DataRepresentation {

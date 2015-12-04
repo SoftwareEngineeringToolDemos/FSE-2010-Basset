@@ -1,20 +1,21 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.search;
 
 import gov.nasa.jpf.Config;
@@ -25,18 +26,17 @@ import gov.nasa.jpf.JPFException;
 import gov.nasa.jpf.JPFListenerException;
 import gov.nasa.jpf.Property;
 import gov.nasa.jpf.State;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.Path;
+import gov.nasa.jpf.jvm.ThreadList;
+import gov.nasa.jpf.jvm.Transition;
 import gov.nasa.jpf.report.Reporter;
 import gov.nasa.jpf.util.IntVector;
 import gov.nasa.jpf.util.JPFLogger;
 import gov.nasa.jpf.util.Misc;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.Path;
-import gov.nasa.jpf.vm.ThreadList;
-import gov.nasa.jpf.vm.Transition;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * the mother of all search classes. Mostly takes care of listeners, keeping
@@ -52,7 +52,7 @@ public abstract class Search {
   protected ArrayList<Error> errors = new ArrayList<Error>();
 
   protected int       depth = 0;
-  protected VM       vm;
+  protected JVM       vm;
 
   protected ArrayList<Property> properties;
 
@@ -68,8 +68,6 @@ public abstract class Search {
   protected boolean done = false;
   protected boolean doBacktrack = false;
 
-  // do we have a probe request
-  protected AtomicBoolean notifyProbeListeners = new AtomicBoolean(false);
 
   /** search listeners. We keep them in a simple array to avoid
    creating objects on each notification */
@@ -112,7 +110,7 @@ public abstract class Search {
   /** storage to keep track of state depths */
   protected final IntVector stateDepth = new IntVector();
 
-  protected Search (Config config, VM vm) {
+  protected Search (Config config, JVM vm) {
     this.vm = vm;
     this.config = config;
 
@@ -230,29 +228,6 @@ public abstract class Search {
   }
 
   /**
-   * request a probe
-   * 
-   * This does not do the actual listener notification, it only stores
-   * the request, which is then processed from within JPFs inner execution loop.
-   * As a consequence, probeSearch() can be called async, and searchProbed() listeners
-   * don't have to bother with synchronization or inconsistent JPF states (notification 
-   * happens from within JPFs main thread after a completed Instruction execution)
-   */
-  public void probeSearch(){
-    notifyProbeListeners.set(true);
-  }
-  
-  /**
-   * this does the actual notification and resets the request, hence this call
-   * should only happen from within JPFs main thread
-   */
-  public void checkAndResetProbeRequest(){
-    if (notifyProbeListeners.compareAndSet(true, false)){
-      notifySearchProbed();
-    }
-  }
-  
-  /**
    * @return error encountered during *last* transition (null otherwise)
    */
   public Error getCurrentError(){
@@ -272,7 +247,7 @@ public abstract class Search {
     return !errors.isEmpty();
   }
 
-  public VM getVM() {
+  public JVM getVM() {
     return vm;
   }
 
@@ -390,19 +365,12 @@ public abstract class Search {
     error(property, null, null);
   }
 
-  public void error (Property property, Path path, ThreadList threadList) {
+  protected void error (Property property, Path path, ThreadList threadList) {
 
     if (getAllErrors) {
-       // otherwise we are going to overwrite it if we go on
-      try {
-        property = property.clone();
-        path = path.clone();
-        threadList = (ThreadList) threadList.clone(); // this makes it a snapshot (deep) clone
-      } catch (CloneNotSupportedException cnsx){
-        throw new JPFException("failed to clone error information: " + cnsx);
-      }
+      path = path.clone(); // otherwise we are going to overwrite it
+      threadList = (ThreadList)threadList.clone(); // this makes it a snapshot (deep) clone
       done = false;
-      
     } else {
       done = true;
     }
@@ -501,20 +469,6 @@ public abstract class Search {
     }
   }
 
-  public void notifySearchProbed() {
-    try {
-      for (int i = 0; i < listeners.length; i++) {
-        listeners[i].searchProbed(this);
-      }
-      if (reporter != null){
-        reporter.searchProbed(this);
-      }
-    } catch (Throwable t) {
-      throw new JPFListenerException("exception during searchProbed() notification", t);
-    }
-  }
-
-  
   protected void notifyPropertyViolated() {
     try {
       for (int i = 0; i < listeners.length; i++) {

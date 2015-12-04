@@ -1,27 +1,30 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.jvm.bytecode;
 
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.MethodInfo;
-import gov.nasa.jpf.vm.ThreadInfo;
+import gov.nasa.jpf.jvm.ChoiceGenerator;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.KernelState;
+import gov.nasa.jpf.jvm.MethodInfo;
+import gov.nasa.jpf.jvm.SystemState;
+import gov.nasa.jpf.jvm.ThreadInfo;
 
 /**
  * this is an artificial bytecode that we use to deal with the particularities of 
@@ -29,13 +32,15 @@ import gov.nasa.jpf.vm.ThreadInfo;
  * the VM. The most obvious difference is that <clinit> execution does not trigger
  * class initialization.
  * A more subtle difference is that we save a wait() - if a class
- * is concurrently initialized, both enter INVOKECLINIT (i.e. compete and sync for/on
+ * is concurrently initialized, both execute INVOKECLINIT (i.e. compete and sync for/on
  * the class object lock), but once the second thread gets resumed and detects that the
  * class is now initialized (by the first thread), it skips the method execution and
  * returns right away (after deregistering as a lock contender). That's kind of hackish,
  * but we have no method to do the wait in, unless we significantly complicate the
  * direct call stubs, which would obfuscate observability (debugging dynamically
  * generated code isn't very appealing). 
+ * 
+ * <2do> pcm - maybe we should move this into the jpf.jvm package, it's artificial anyways 
  */
 public class INVOKECLINIT extends INVOKESTATIC {
 
@@ -43,46 +48,63 @@ public class INVOKECLINIT extends INVOKESTATIC {
     super(ci.getSignature(), "<clinit>", "()V");
   }
 
-  @Override
-  public Instruction execute (ThreadInfo ti) {    
+  public Instruction execute (SystemState ss, KernelState ks, ThreadInfo ti) {
+    
     MethodInfo callee = getInvokedMethod(ti);
-    ClassInfo ciClsObj = callee.getClassInfo();
-    ElementInfo ei = ciClsObj.getClassObject();
+    ClassInfo ci = callee.getClassInfo();
+    
+    ElementInfo ei = ti.getElementInfo(ci.getClassObjectRef());
 
-    if (ciClsObj.isInitialized()) { // somebody might have already done it if this is re-executed
-      if (ei.isRegisteredLockContender(ti)){
-        ei = ei.getModifiableInstance();
-        ei.unregisterLockContender(ti);
+    // first time around - reexecute if the scheduling policy gives us a choice point
+    if (!ti.isFirstStepInsn()) {
+      
+      if (!ei.canLock(ti)) {
+        // block first, so that we don't get this thread in the list of CGs
+        ei.block(ti);
       }
-      return getNext();
-    }
-
-    // not much use to update sharedness, clinits are automatically synchronized
-    if (reschedulesLockAcquisition(ti, ei)){     // this blocks or registers as lock contender
-      return this;
+      
+      ChoiceGenerator cg = ss.getSchedulerFactory().createSyncMethodEnterCG(ei, ti);
+      if (ss.setNextChoiceGenerator(cg)){
+        if (!ti.isBlocked()) {
+          // record that this thread would lock the object upon next execution
+          ei.registerLockContender(ti);
+        }
+        return this;   // repeat exec, keep insn on stack
+      }
+      
+      assert !ti.isBlocked() : "scheduling policy did not return ChoiceGenerator for blocking INVOKE";
+      
+    } else {
+      // if we got here, we can execute, and have the lock
+      // but there still might have been another thread that passed us with the init
+      // note that the state in this case would be INITIALIZED, otherwise we wouldn't
+      // have gotten the lock
+      if (!ci.needsInitialization()) {
+        // we never got the lock it (that would have happened in MethodInfo.enter(), but
+        // registerLockContender added it to the lockedThreads list of the monnitor,
+        // and ti might be blocked on it (if we couldn't lock in the top half above)
+        ei.unregisterLockContender(ti);
+        return getNext();
+      }
     }
     
-    // if we get here we still have to execute the clinit method
-    setupCallee( ti, callee); // this creates, initializes & pushes the callee StackFrame, then acquires the lock
-    ciClsObj.setInitializing(ti);
-
-    return ti.getPC(); // we can't just return the first callee insn if a listener throws an exception
+    // enter the method body, return its first insn
+    // (this would take the lock, reset the lockRef etc., so make sure all these
+    // side effects are dealt with if we bail out)
+    return callee.execute(ti);
   }
 
-  @Override
   public boolean isExtendedInstruction() {
     return true;
   }
 
   public static final int OPCODE = 256;
 
-  @Override
   public int getByteCode () {
     return OPCODE;
   }
   
-  @Override
-  public void accept(JVMInstructionVisitor insVisitor) {
+  public void accept(InstructionVisitor insVisitor) {
 	  insVisitor.visit(this);
   }
 }

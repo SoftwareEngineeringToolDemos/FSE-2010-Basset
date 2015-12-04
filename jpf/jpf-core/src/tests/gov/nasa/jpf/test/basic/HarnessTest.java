@@ -1,21 +1,3 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
-
 package gov.nasa.jpf.test.basic;
 
 import gov.nasa.jpf.JPF;
@@ -62,7 +44,7 @@ public class HarnessTest extends TestJPF {
 
   @Test
   public void verifyRuntimeException() {
-    if (verifyPropertyViolation(new TypeRef("gov.nasa.jpf.vm.NoUncaughtExceptionsProperty"))) {
+    if (verifyPropertyViolation(new TypeRef("gov.nasa.jpf.jvm.NoUncaughtExceptionsProperty"))) {
       System.out.println("** this is verifyRuntimeException() - JPF should find an unhandled exception");
 
       throw new RuntimeException("Bang!");
@@ -76,14 +58,14 @@ public class HarnessTest extends TestJPF {
     }
   }
 
-  // low level TestJPF API test
   @Test
-  public void testLowLevelAPI() {
-    
-    JPF jpf = noPropertyViolation();
+  public void recursive() {
+    JPF jpf;
+
+    jpf = noPropertyViolation("gov.nasa.jpf.util.test.TestJPFHelper", HarnessTest.class.getName(), "recursive");
 
     if (jpf == null) {
-      System.out.println("** this is low level API test - it should succeed");
+      System.out.println("** this is low level API recursive - it should succeed");
     } else {
       assert jpf.getSearchErrors().isEmpty() : "unexpected JPF search errors";
     }

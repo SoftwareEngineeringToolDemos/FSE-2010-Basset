@@ -1,34 +1,32 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.jvm.bytecode;
 
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.BooleanChoiceGenerator;
-import gov.nasa.jpf.vm.KernelState;
-import gov.nasa.jpf.vm.MethodInfo;
-import gov.nasa.jpf.vm.StackFrame;
-import gov.nasa.jpf.vm.SystemState;
-import gov.nasa.jpf.vm.ThreadInfo;
+import gov.nasa.jpf.jvm.BooleanChoiceGenerator;
+import gov.nasa.jpf.jvm.KernelState;
+import gov.nasa.jpf.jvm.SystemState;
+import gov.nasa.jpf.jvm.ThreadInfo;
 
 /**
  * abstraction for all comparison instructions
  */
-public abstract class IfInstruction extends Instruction implements JVMInstruction {
+public abstract class IfInstruction extends Instruction {
   protected int targetPosition;  // insn position at jump insnIndex
   protected Instruction target;  // jump target
   
@@ -51,7 +49,6 @@ public abstract class IfInstruction extends Instruction implements JVMInstructio
    *  Added so that SimpleIdleFilter can detect do-while loops when 
    * the while statement evaluates to true.
    */
-  @Override
   public boolean isBackJump () { 
     return (conditionValue) && (targetPosition <= position);
   }
@@ -61,7 +58,7 @@ public abstract class IfInstruction extends Instruction implements JVMInstructio
    * (not ideal to have this public, but some listeners might need it for
    * skipping the insn, plus we require it for subclass factorization)
    */
-  public abstract boolean popConditionValue(StackFrame frame);
+  public abstract boolean popConditionValue(ThreadInfo ti);
   
   public Instruction getTarget() {
     if (target == null) {
@@ -70,11 +67,8 @@ public abstract class IfInstruction extends Instruction implements JVMInstructio
     return target;
   }
   
-  @Override
-  public Instruction execute (ThreadInfo ti) {
-    StackFrame frame = ti.getModifiableTopFrame();
-
-    conditionValue = popConditionValue(frame);
+  public Instruction execute (SystemState ss, KernelState ks, ThreadInfo ti) {
+    conditionValue = popConditionValue(ti);
     if (conditionValue) {
       return getTarget();
     } else {
@@ -93,9 +87,8 @@ public abstract class IfInstruction extends Instruction implements JVMInstructio
         return this;
 
       } else {
-        StackFrame frame = ti.getModifiableTopFrame();
         // some listener did override the CG, fallback to normal operation
-        conditionValue = popConditionValue(frame);
+        conditionValue = popConditionValue(ti);
         if (conditionValue) {
           return getTarget();
         } else {
@@ -107,8 +100,7 @@ public abstract class IfInstruction extends Instruction implements JVMInstructio
       BooleanChoiceGenerator cg = ss.getCurrentChoiceGenerator("ifAll", BooleanChoiceGenerator.class);
       assert (cg != null) : "no BooleanChoiceGenerator";
       
-      StackFrame frame = ti.getModifiableTopFrame();
-      popConditionValue(frame); // we are not interested in concrete values
+      popConditionValue(ti); // we are not interested in concrete values
       
       conditionValue = cg.getNextChoice();
       
@@ -121,36 +113,15 @@ public abstract class IfInstruction extends Instruction implements JVMInstructio
     }
   }
   
-  @Override
   public String toString () {
     return getMnemonic() + " " + targetPosition;
   }
   
-  @Override
   public int getLength() {
     return 3; // usually opcode, bb1, bb2
   }
   
-  @Override
-  public void accept(JVMInstructionVisitor insVisitor) {
+  public void accept(InstructionVisitor insVisitor) {
 	  insVisitor.visit(this);
-  }
-
-  @Override
-  public Instruction typeSafeClone(MethodInfo mi) {
-    IfInstruction clone = null;
-
-    try {
-      clone = (IfInstruction) super.clone();
-
-      // reset the method that this insn belongs to
-      clone.mi = mi;
-
-      clone.target = null;
-    } catch (CloneNotSupportedException e) {
-      e.printStackTrace();
-    }
-
-    return clone;
   }
 }

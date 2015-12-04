@@ -34,7 +34,7 @@ import gov.nasa.jpf.actor.icore.IMessage;
 import gov.nasa.jpf.actor.icore.IPlatformListener;
 import gov.nasa.jpf.actor.util.Logger;
 import gov.nasa.jpf.actor.util.Stat;
-import gov.nasa.jpf.vm.Verify;
+import gov.nasa.jpf.jvm.Verify;
 import gov.nasa.jpf.annotation.FilterField;
 
 import static gov.nasa.jpf.actor.util.Constants.*;

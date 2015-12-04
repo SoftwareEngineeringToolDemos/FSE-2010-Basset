@@ -1,29 +1,27 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2011 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 
 package gov.nasa.jpf.jvm;
 
+import gov.nasa.jpf.classfile.ClassFile;
+import gov.nasa.jpf.classfile.ClassFileException;
 import gov.nasa.jpf.util.test.TestJPF;
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.ClassParseException;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.LocalVarInfo;
-import gov.nasa.jpf.vm.MethodInfo;
 
 import java.io.File;
 
@@ -42,14 +40,6 @@ public class MethodInfoTest extends TestJPF {
     double instanceNoArgs() {int a=42; double b=42.0; b+=a; return b;}
     double instanceInt( int intArg) {int a=42; double b=42.0; b+=a; return b;}
     double instanceIntString  (int intArg, String stringArg) {int a=42; double b=42.0; b+=a; return b;}
-    
-    int instanceCycleMethod (int intArg, int int2Arg) {
-      for (int i = 0; i < int2Arg; ++i) {
-        // it's important to have a for cycle because it breaks the instruction per line monotony
-        intArg += intArg;
-      }
-      return intArg;
-    }
   }
   
   @Test
@@ -57,7 +47,8 @@ public class MethodInfoTest extends TestJPF {
     File file = new File("build/tests/gov/nasa/jpf/jvm/MethodInfoTest$MyClass.class");
 
     try {
-      ClassInfo ci = new NonResolvedClassInfo( "gov.nasa.jpf.jvm.MethodInfoTest$MyClass",  file);
+      ClassFile cf = new ClassFile(file);
+      ClassInfo ci = new NonResolvedClassInfo(cf);
       MethodInfo mi;
       LocalVarInfo[] args;
 
@@ -116,39 +107,10 @@ public class MethodInfoTest extends TestJPF {
           && args[1].getName().equals("intArg") && args[2].getName().equals("stringArg"));
 
     } catch (NullPointerException npe){
-      npe.printStackTrace();
       fail("method not found");
-    } catch (ClassParseException cfx){
-      cfx.printStackTrace();
-      fail(cfx.toString());
-    }
-  }
-  
-  @Test
-  public void testGetInstructionsForLine () {
-    File file = new File(
-            "build/tests/gov/nasa/jpf/jvm/MethodInfoTest$MyClass.class");
-    try {
-      ClassInfo ci = new NonResolvedClassInfo("gov.nasa.jpf.jvm.MethodInfoTest$MyClass", file);
-      MethodInfo mi = ci.getMethod("instanceCycleMethod", "(II)I", false);
-
-      nextInstruction:
-      for (Instruction instruction : mi.getInstructions()) {
-        int l = instruction.getLineNumber();
-        Instruction[] foundInstructions = mi.getInstructionsForLine(l);
-        System.out.printf("%d : %s\n", l, instruction);
-
-        for (int j=0; j<foundInstructions.length; j++){
-          if (foundInstructions[j] == instruction){
-            continue nextInstruction;
-          }
-        }
-        
-        fail("instruction not in list: " + instruction);
-      }
-    } catch (ClassParseException cfx) {
-      cfx.printStackTrace();
-      fail(cfx.toString());
+    } catch (ClassFileException cfx){
+      //cfx.printStackTrace();
+      fail("ClassFileException: " + cfx);
     }
   }
 }

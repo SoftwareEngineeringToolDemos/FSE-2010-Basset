@@ -1,4 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<session version="1.0">
-<refactoring comment="Delete resource &apos;jpf_juit_demo&apos;" deleteContents="false" description="Delete resource &apos;jpf_juit_demo&apos;" element1="/jpf_juit_demo" flags="7" id="org.eclipse.ltk.core.refactoring.delete.resources" resources="1" stamp="1444605991737"/>
-</session>

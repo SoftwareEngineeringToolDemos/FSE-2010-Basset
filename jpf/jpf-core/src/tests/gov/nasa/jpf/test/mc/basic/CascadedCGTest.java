@@ -1,39 +1,39 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2010 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 
 package gov.nasa.jpf.test.mc.basic;
 
 
 import gov.nasa.jpf.ListenerAdapter;
+import gov.nasa.jpf.jvm.ChoiceGenerator;
+import gov.nasa.jpf.jvm.FieldInfo;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.SystemState;
+import gov.nasa.jpf.jvm.ThreadInfo;
+import gov.nasa.jpf.jvm.Verify;
 import gov.nasa.jpf.jvm.bytecode.EXECUTENATIVE;
 import gov.nasa.jpf.jvm.bytecode.GETFIELD;
+import gov.nasa.jpf.jvm.bytecode.Instruction;
+import gov.nasa.jpf.jvm.choice.IntChoiceFromSet;
+import gov.nasa.jpf.jvm.choice.IntIntervalGenerator;
 import gov.nasa.jpf.search.Search;
 import gov.nasa.jpf.util.test.TestJPF;
-import gov.nasa.jpf.vm.ChoiceGenerator;
-import gov.nasa.jpf.vm.FieldInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.StackFrame;
-import gov.nasa.jpf.vm.SystemState;
-import gov.nasa.jpf.vm.ThreadInfo;
-import gov.nasa.jpf.vm.Verify;
-import gov.nasa.jpf.vm.choice.IntChoiceFromSet;
-import gov.nasa.jpf.vm.choice.IntIntervalGenerator;
 
 import org.junit.Test;
 
@@ -45,12 +45,13 @@ public class CascadedCGTest extends TestJPF {
   public static class IntChoiceCascader extends ListenerAdapter {
     static int result;
 
-    @Override
-    public void instructionExecuted(VM vm, ThreadInfo ti, Instruction nextInsn, Instruction executedInsn) {
+    public void instructionExecuted(JVM vm) {
+      Instruction insn = vm.getLastInstruction();
+      ThreadInfo ti = vm.getLastThreadInfo();
       SystemState ss = vm.getSystemState();
 
-      if (executedInsn instanceof EXECUTENATIVE) { // break on native method exec
-        EXECUTENATIVE exec = (EXECUTENATIVE) executedInsn;
+      if (insn instanceof EXECUTENATIVE) { // break on native method exec
+        EXECUTENATIVE exec = (EXECUTENATIVE) insn;
 
         if (exec.getExecutedMethodName().equals("getInt")){// this insn did create a CG
           if (!ti.isFirstStepInsn()){
@@ -117,12 +118,13 @@ public class CascadedCGTest extends TestJPF {
 
   public static class FieldAccessCascader extends ListenerAdapter {
 
-    @Override
-    public void instructionExecuted(VM vm, ThreadInfo ti, Instruction nextInsn, Instruction executedInsn) {
+    public void instructionExecuted(JVM vm) {
+      Instruction insn = vm.getLastInstruction();
+      ThreadInfo ti = vm.getLastThreadInfo();
       SystemState ss = vm.getSystemState();
 
-      if (executedInsn instanceof GETFIELD){
-        GETFIELD getInsn = (GETFIELD) executedInsn;
+      if (insn instanceof GETFIELD){
+        GETFIELD getInsn = (GETFIELD) insn;
         FieldInfo fi = getInsn.getFieldInfo();
         if (fi.getName().equals("mySharedField")){
 
@@ -136,24 +138,20 @@ public class CascadedCGTest extends TestJPF {
             // we can reexecute
             if (!ti.willReExecuteInstruction()){
               // restore old operand stack contents
-              StackFrame frame = ti.getModifiableTopFrame();
-
-              frame.pop();
-              frame.pushRef( getInsn.getLastThis());
+              ti.pop();
+              ti.push(getInsn.getLastThis());
             }
 
             cg = new IntChoiceFromSet("fieldReplace", 42, 43);
             ss.setNextChoiceGenerator(cg);
             ti.reExecuteInstruction();
 
-            System.out.println("# listener registered CG: " + cg);
+            System.out.println("# listener registered: " + cg);
 
           } else {
-            StackFrame frame = ti.getModifiableTopFrame();
-
             int v = cg.getNextChoice();
-            int n = frame.pop();
-            frame.push(v);
+            int n = ti.pop();
+            ti.push(v);
 
             System.out.println("# listener replacing " + n + " with " + v);
           }
@@ -162,34 +160,23 @@ public class CascadedCGTest extends TestJPF {
     }
 
     //--- those are just for debugging purposes
-    @Override
     public void stateBacktracked(Search search) {
       System.out.println("#------ [" + search.getDepth() + "] backtrack: " + search.getStateId());
     }
-    
-    @Override
     public void stateAdvanced(Search search){
       System.out.println("#------ " + search.getStateId() + " isNew: " + search.isNewState() + ", isEnd: " + search.isEndState());
     }
-    
-    @Override
-    public void threadScheduled(VM vm, ThreadInfo ti){
-      System.out.println("# running thread: " + ti);
+    public void threadScheduled(JVM vm){
+      System.out.println("# running thread: " + vm.getLastThreadInfo());
     }
-    
-    @Override
-    public void threadTerminated(VM vm, ThreadInfo ti){
-      System.out.println("# terminated thread: " + ti);
+    public void threadTerminated(JVM vm){
+      System.out.println("# terminated thread: " + vm.getLastThreadInfo());
     }
-    
-    @Override
-    public void threadStarted(VM vm, ThreadInfo ti){
-      System.out.println("# started thread: " + ti);
+    public void threadStarted(JVM vm){
+      System.out.println("# started thread: " + vm.getLastThreadInfo());
     }
-    
-    @Override
-    public void choiceGeneratorAdvanced (VM vm, ChoiceGenerator<?> currentCG) {
-      System.out.println("# choice: " + currentCG);
+    public void choiceGeneratorAdvanced (JVM vm) {
+      System.out.println("# choice: " + vm.getLastChoiceGenerator());
     }
   }
 
@@ -199,8 +186,7 @@ public class CascadedCGTest extends TestJPF {
   public void testMixedThreadDataCGs () {
     if (verifyNoPropertyViolation("+listener=.test.mc.basic.CascadedCGTest$FieldAccessCascader")){
       Thread t = new Thread(){
-        @Override
-		public void run() {
+        public void run() {
           int n = mySharedField;
           System.out.print("<thread> mySharedField read: ");
           System.out.println( n);

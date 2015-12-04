@@ -1,23 +1,31 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2010 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.util;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -377,33 +385,24 @@ public class FileUtils {
       byte[] data = new byte[(int)length];
 
       FileInputStream is = new FileInputStream(file);
-      try {
-        getContents(is, data);
+      int nRead = 0;
 
-      } catch (IOException iox){
-        return null;
-
-      } finally {
-        is.close();
+      while (nRead < data.length) {
+        int n = is.read(data, nRead, (data.length - nRead));
+        if (n < 0) {
+          throw new IOException("premature end of file: " + file);
+        }
+        nRead += n;
       }
+
+      is.close();
 
       return data;
     }
 
     return null;
   }
-
-  public static void getContents(InputStream is, byte[] buf) throws IOException {
-    int nRead = 0;
-    while (nRead < buf.length) {
-      int n = is.read(buf, nRead, buf.length - nRead);
-      if (n < 0) {
-        throw new IOException("premature end of inputstream: " + buf.length + '/' + nRead);
-      }
-      nRead += n;
-    }
-  }
-
+  
   public static String getContentsAsString( File file) throws IOException {
     byte[] data = getContents(file);
     return new String(data);

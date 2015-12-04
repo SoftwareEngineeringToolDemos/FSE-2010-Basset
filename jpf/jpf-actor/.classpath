@@ -5,11 +5,11 @@
 	<classpathentry kind="src" output="build/tests" path="src/tests"/>
 	<classpathentry kind="src" output="build/peers" path="src/peers"/>
 	<classpathentry kind="src" output="build/examples" path="src/examples"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/J2SE-1.5"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="lib" path="lib/foundry-1.0.jar"/>
-	<classpathentry kind="lib" path="/Users/Gaurav/projects/jpf/jpf-actor/lib/scala-compiler.jar"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/4"/>
+	<classpathentry kind="lib" path="lib/scala-compiler-2.7.3.jar"/>
+	<classpathentry kind="lib" path="lib/scala-library-2.7.3.jar"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/jpf-core"/>
-	<classpathentry kind="lib" path="/Users/Gaurav/projects/jpf/jpf-actor/lib/scala-library.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/4"/>
 	<classpathentry kind="output" path="build/main"/>
 </classpath>

@@ -1,29 +1,30 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.jvm.bytecode;
 
-import gov.nasa.jpf.vm.ClassChangeException;
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.MJIEnv;
-import gov.nasa.jpf.vm.MethodInfo;
-import gov.nasa.jpf.vm.ThreadInfo;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.KernelState;
+import gov.nasa.jpf.jvm.MJIEnv;
+import gov.nasa.jpf.jvm.MethodInfo;
+import gov.nasa.jpf.jvm.SystemState;
+import gov.nasa.jpf.jvm.ThreadInfo;
 
 
 /**
@@ -43,81 +44,30 @@ public abstract class VirtualInvocation extends InstanceInvocation {
     super(clsDescriptor, methodName, signature);
   }
 
-  @Override
-  public String toPostExecString(){
-    StringBuilder sb = new StringBuilder();
-    sb.append(getMnemonic());
-    sb.append(' ');
-    
-    if (invokedMethod != null){
-      sb.append( lastCalleeCi.getName());
-      sb.append('@');
-      sb.append(Integer.toHexString(lastObj));
-      sb.append('.');
-      sb.append(invokedMethod.getUniqueName());
-
-      if (invokedMethod.isMJI()){
-        sb.append(" [native]");
-      }
-      
-    } else { // something went wrong, the method wasn't found
-      if (lastCalleeCi != null){
-        sb.append( lastCalleeCi.getName());
-      } else {
-        sb.append(cname);
-      }
-      sb.append('@');
-      if (lastObj == MJIEnv.NULL){
-        sb.append("<null>");
-      } else {
-        sb.append(Integer.toHexString(lastObj));
-      }
-      sb.append('.');
-      sb.append(mname);
-      sb.append(signature);
-      sb.append(" (?)");
-    }
-    
-    return sb.toString();
-  }
-  
-  @Override
-  public Instruction execute (ThreadInfo ti) {
+  public Instruction execute (SystemState ss, KernelState ks, ThreadInfo ti) {
     int objRef = ti.getCalleeThis(getArgSize());
-    MethodInfo callee;
 
-    if (objRef == MJIEnv.NULL) {
-      lastObj = MJIEnv.NULL;
+    if (objRef == -1) {
+      lastObj = -1;
       return ti.createAndThrowException("java.lang.NullPointerException", "Calling '" + mname + "' on null object");
     }
 
-    try {
-      callee = getInvokedMethod(ti, objRef);
-    } catch (ClassChangeException ccx){
-      return ti.createAndThrowException("java.lang.IncompatibleClassChangeError", ccx.getMessage());
-    }
-    
-    ElementInfo ei = ti.getElementInfo(objRef);
-    
-    if (callee == null) {
+    MethodInfo mi = getInvokedMethod(ti, objRef);
+
+    if (mi == null) {
       String clsName = ti.getClassInfo(objRef).getName();
       return ti.createAndThrowException("java.lang.NoSuchMethodError", clsName + '.' + mname);
-    } else {
-      if (callee.isAbstract()){
-        return ti.createAndThrowException("java.lang.AbstractMethodError", callee.getFullName() + ", object: " + ei);
-      }
     }
+    
+    ElementInfo ei = ks.heap.get(objRef);
 
-    if (callee.isSynchronized()) {
-      ei = ti.getScheduler().updateObjectSharedness(ti, ei, null); // locks most likely belong to shared objects
-      if (reschedulesLockAcquisition(ti, ei)){
+    if (mi.isSynchronized()) {
+      if (checkSyncCG(ei, ss, ti)){
         return this;
       }
     }
 
-    setupCallee( ti, callee); // this creates, initializes and pushes the callee StackFrame
-
-    return ti.getPC(); // we can't just return the first callee insn if a listener throws an exception
+    return mi.execute(ti);    // this will lock the object if necessary
   }
   
   /**
@@ -137,7 +87,6 @@ public abstract class VirtualInvocation extends InstanceInvocation {
   }
 
 
-  @Override
   public MethodInfo getInvokedMethod(ThreadInfo ti){
     int objRef;
 
@@ -161,13 +110,10 @@ public abstract class VirtualInvocation extends InstanceInvocation {
         lastCalleeCi = cci;
         invokedMethod = cci.getMethod(mname, true);
 
+        // here we could catch the NoSuchMethodError
         if (invokedMethod == null) {
-          invokedMethod = cci.getDefaultMethod(mname);
-                    
-          if (invokedMethod == null){
-            lastObj = MJIEnv.NULL;
-            lastCalleeCi = null;
-          }
+          lastObj = MJIEnv.NULL;
+          lastCalleeCi = null;
         }
       }
 
@@ -180,7 +126,6 @@ public abstract class VirtualInvocation extends InstanceInvocation {
     return invokedMethod;
   }
 
-  @Override
   public Object getFieldValue (String id, ThreadInfo ti){
     int objRef = getCalleeThis(ti);
     ElementInfo ei = ti.getElementInfo(objRef);
@@ -194,27 +139,7 @@ public abstract class VirtualInvocation extends InstanceInvocation {
     return v;
   }
   
-  @Override
-  public void accept(JVMInstructionVisitor insVisitor) {
+  public void accept(InstructionVisitor insVisitor) {
 	  insVisitor.visit(this);
-  }
-
-  @Override
-  public Instruction typeSafeClone(MethodInfo clonedMethod) {
-    VirtualInvocation clone = null;
-
-    try {
-      clone = (VirtualInvocation) super.clone();
-
-      // reset the method that this insn belongs to
-      clone.mi = clonedMethod;
-
-      clone.lastCalleeCi = null;
-      clone.invokedMethod = null;
-    } catch (CloneNotSupportedException e) {
-      e.printStackTrace();
-    }
-
-    return clone;
   }
 }

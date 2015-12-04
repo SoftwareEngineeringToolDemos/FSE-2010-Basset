@@ -1,25 +1,26 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+// 
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+// 
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.test.mc.basic;
 
 
+import gov.nasa.jpf.jvm.Verify;
 import gov.nasa.jpf.util.test.TestJPF;
-import gov.nasa.jpf.vm.Verify;
 
 import java.io.File;
 
@@ -29,6 +30,10 @@ public class TraceTest extends TestJPF {
 
   static final String TEST_CLASS = TraceTest.class.getName();
   static final String TRACE = "trace";
+
+  public static void main(String[] args) {    // <2do> Fix this test so that it doesn't require main
+    runTestsOfThisClass(args);
+  }
 
   // the method run by JPF
   public void foo () {
@@ -47,8 +52,7 @@ public class TraceTest extends TestJPF {
   }
 
   // the method that runs JPF
-  @Test
-  public void testPartialTrace () {
+  @Test public void testPartialTrace () {
     File tf = new File(TRACE);
 
     try {
@@ -58,15 +62,16 @@ public class TraceTest extends TestJPF {
       Verify.resetCounter(0);
 
       // first JPF run
-      noPropertyViolation(setTestMethod(TEST_CLASS, "foo"));
+      noPropertyViolation(TEST_CLASS, "foo");
 
       if (Verify.getCounter(0) != 1) {
         fail("wrong number of backtracks on non-replay run: " + Verify.getCounter(0));
       }
 
       // second JPF run
-      noPropertyViolation( setTestMethod(TEST_CLASS, "foo"), "+listener=.listener.ChoiceSelector",
-              "+choice.use_trace=" + TRACE);
+      noPropertyViolation("+listener=.listener.ChoiceSelector",
+              "+choice.use_trace=" + TRACE,
+              TEST_CLASS, "foo");
 
       if (Verify.getCounter(0) != 5) {
         fail("wrong number of backtracks on replay run: " + Verify.getCounter(0));
@@ -86,9 +91,6 @@ public class TraceTest extends TestJPF {
     boolean b1 = Verify.getBoolean();
     int i4 = Verify.getInt(0,3);
 
-    System.out.printf("%d,%d,%d,%b,%d\n", i1, i2, i3, b1, i4);
-    
-    
     assert !(i1 == 0 && i2 == 1 && i3 == 2 && b1 && i4 == 3);
   }
 
@@ -102,12 +104,14 @@ public class TraceTest extends TestJPF {
       }
 
       // first JPF run
-      System.out.println("--- creating trace");
-      assertionError(setTestMethod("bar"), "+listener=.listener.TraceStorer", "+trace.file=" + TRACE);
+      assertionError("+listener=.listener.TraceStorer",
+                     "+trace.file=" + TRACE,
+                     TEST_CLASS, "bar");
 
       // second JPF run
-      System.out.println("--- replaying trace");
-      assertionError(setTestMethod("bar"), "+listener=.listener.ChoiceSelector","+choice.use_trace=" + TRACE);
+      assertionError("+listener=.listener.ChoiceSelector",
+                     "+choice.use_trace=" + TRACE,
+                     TEST_CLASS, "bar");
     } finally {
       tf.delete();
     }

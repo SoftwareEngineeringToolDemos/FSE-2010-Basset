@@ -1,29 +1,29 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.jvm.bytecode;
 
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.ClassLoaderInfo;
-import gov.nasa.jpf.vm.ElementInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.LoadOnJPFRequired;
-import gov.nasa.jpf.vm.MethodInfo;
-import gov.nasa.jpf.vm.ThreadInfo;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.ElementInfo;
+import gov.nasa.jpf.jvm.KernelState;
+import gov.nasa.jpf.jvm.MethodInfo;
+import gov.nasa.jpf.jvm.SystemState;
+import gov.nasa.jpf.jvm.ThreadInfo;
 
 
 /**
@@ -40,13 +40,11 @@ public class INVOKESPECIAL extends InstanceInvocation {
   }
 
 
-  @Override
   public int getByteCode () {
     return 0xB7;
   }
 
-  @Override
-  public Instruction execute (ThreadInfo ti) {
+  public Instruction execute (SystemState ss, KernelState ks, ThreadInfo ti) {
     int argSize = getArgSize();
     int objRef = ti.getCalleeThis( argSize);
     lastObj = objRef;
@@ -54,28 +52,21 @@ public class INVOKESPECIAL extends InstanceInvocation {
     // we don't have to check for NULL objects since this is either a ctor, a 
     // private method, or a super method
 
-    MethodInfo callee;  
-    try {
-      callee = getInvokedMethod(ti);
-    } catch(LoadOnJPFRequired rre) {
-      return ti.getPC();
-    }      
+    MethodInfo mi = getInvokedMethod(ti);
 
-    if (callee == null){
+    if (mi == null){
       return ti.createAndThrowException("java.lang.NoSuchMethodException", "Calling " + cname + '.' + mname);
     }
 
-    ElementInfo ei = ti.getElementInfo(objRef);
-    if (callee.isSynchronized()){
-      ei = ti.getScheduler().updateObjectSharedness(ti, ei, null); // locks most likely belong to shared objects
-      if (reschedulesLockAcquisition(ti, ei)){
+    ElementInfo ei = ks.heap.get(objRef);
+
+    if (mi.isSynchronized()){
+      if (checkSyncCG(ei, ss, ti)){
         return this;
       }
     }
 
-    setupCallee( ti, callee); // this creates, initializes and pushes the callee StackFrame
-
-    return ti.getPC(); // we can't just return the first callee insn if a listener throws an exception
+    return mi.execute(ti);
   }
 
   /**
@@ -97,14 +88,13 @@ public class INVOKESPECIAL extends InstanceInvocation {
   /**
     * we can do some more caching here - the MethodInfo should be const
     */
-  @Override
   public MethodInfo getInvokedMethod (ThreadInfo th) {
 
     // since INVOKESPECIAL is only used for private methods and ctors,
     // we don't have to deal with null object calls
 
     if (invokedMethod == null) {
-      ClassInfo ci = ClassLoaderInfo.getCurrentResolvedClassInfo(cname);
+      ClassInfo ci = ClassInfo.getResolvedClassInfo(cname);
       boolean recursiveLookup = (mname.charAt(0) != '<'); // no hierarchy lookup for <init>
       invokedMethod = ci.getMethod(mname, recursiveLookup);
     }
@@ -112,7 +102,6 @@ public class INVOKESPECIAL extends InstanceInvocation {
     return invokedMethod; // we can store internally
   }
 
-  @Override
   public String toString() {
     return ("invokespecial " + cname + '.' + mname);
   }
@@ -131,8 +120,7 @@ public class INVOKESPECIAL extends InstanceInvocation {
     return v;
   }
 
-  @Override
-  public void accept(JVMInstructionVisitor insVisitor) {
+  public void accept(InstructionVisitor insVisitor) {
 	  insVisitor.visit(this);
   }
 }

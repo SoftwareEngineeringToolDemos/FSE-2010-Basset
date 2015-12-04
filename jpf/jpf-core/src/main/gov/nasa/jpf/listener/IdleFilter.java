@@ -1,35 +1,36 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.listener;
 
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.JPF;
 import gov.nasa.jpf.JPFConfigException;
 import gov.nasa.jpf.PropertyListenerAdapter;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.MethodInfo;
+import gov.nasa.jpf.jvm.ThreadInfo;
 import gov.nasa.jpf.jvm.bytecode.ArrayStoreInstruction;
-import gov.nasa.jpf.jvm.bytecode.JVMInvokeInstruction;
+import gov.nasa.jpf.jvm.bytecode.Instruction;
+import gov.nasa.jpf.jvm.bytecode.InvokeInstruction;
 import gov.nasa.jpf.search.Search;
 import gov.nasa.jpf.util.DynamicObjectArray;
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.MethodInfo;
-import gov.nasa.jpf.vm.ThreadInfo;
 
 import java.util.logging.Logger;
 
@@ -118,7 +119,6 @@ public class IdleFilter extends PropertyListenerAdapter {
 
   }
   
-  @Override
   public void stateAdvanced(Search search) {
     ts.backJumps = 0;
     ts.isCleared = false;
@@ -128,7 +128,6 @@ public class IdleFilter extends PropertyListenerAdapter {
     brokeTransition = false;
   }
 
-  @Override
   public void stateBacktracked(Search search) {
     ts.backJumps = 0;
     ts.isCleared = false;
@@ -137,8 +136,9 @@ public class IdleFilter extends PropertyListenerAdapter {
   }
 
   // ----------------------------------------------------- VMListener interface
-  @Override
-  public void instructionExecuted(VM vm, ThreadInfo ti, Instruction nextInsn, Instruction executedInsn) {
+  public void instructionExecuted(JVM jvm) {
+    Instruction insn = jvm.getLastInstruction();
+    ThreadInfo ti = jvm.getLastThreadInfo();
 
     int tid = ti.getId();
     ts = threadStats.get(tid);
@@ -147,35 +147,35 @@ public class IdleFilter extends PropertyListenerAdapter {
       threadStats.set(tid, ts);
     }
 
-    if (executedInsn.isBackJump()) {
+    if (insn.isBackJump()) {
       ts.backJumps++;
 
       int loopStackDepth = ti.getStackDepth();
-      int loopPc = nextInsn.getPosition();
+      int loopPc = jvm.getNextInstruction().getPosition();
 
       if ((loopStackDepth != ts.loopStackDepth) || (loopPc != ts.loopStartPc)) {
         // new loop, reset
         ts.isCleared = false;
         ts.loopStackDepth = loopStackDepth;
         ts.loopStartPc = loopPc;
-        ts.loopEndPc = executedInsn.getPosition();
+        ts.loopEndPc = insn.getPosition();
         ts.backJumps = 0;
         
       } else {
         if (!ts.isCleared) {
           if (ts.backJumps > maxBackJumps) {
 
-            ti.reschedule("idleFilter"); // this breaks the executePorStep loop
-            MethodInfo mi = executedInsn.getMethodInfo();
+            ti.reschedule(false); // this breaks the executePorStep loop
+            MethodInfo mi = insn.getMethodInfo();
             ClassInfo ci = mi.getClassInfo();
-            int line = mi.getLineNumber(executedInsn);
+            int line = mi.getLineNumber(insn);
             String file = ci.getSourceFileName();
 
             switch (action) {
               case JUMP:
                 // pretty bold, we jump past the loop end and go on from there
 
-                Instruction next = executedInsn.getNext();
+                Instruction next = insn.getNext();
                 ti.setNextPC(next);
 
                 log.warning("jumped past loop in: " + ti.getName() +
@@ -184,7 +184,7 @@ public class IdleFilter extends PropertyListenerAdapter {
 
               case PRUNE:
                 // cut this sucker off - we declare this a visited state
-                vm.ignoreState();
+                jvm.ignoreState();
                 log.warning("pruned thread: " + ti.getName() +
                         "\n\tat " + ci.getName() + "." + mi.getName() + "(" + file + ":" + line + ")");
                 break;
@@ -192,7 +192,7 @@ public class IdleFilter extends PropertyListenerAdapter {
               case BREAK:
                 // just break the transition and let the state matching take over
                 brokeTransition = true;
-                ti.breakTransition("breakIdleLoop");
+                ti.breakTransition();
 
                 log.warning("breaks transition on suspicious loop in thread: " + ti.getName() +
                         "\n\tat " + ci.getName() + "." + mi.getName() + "(" + file + ":" + line + ")");
@@ -202,7 +202,7 @@ public class IdleFilter extends PropertyListenerAdapter {
               case YIELD:
                 // give other threads a chance to run
                 brokeTransition = true;
-                ti.reschedule("rescheduleIdleLoop");
+                ti.yield();
 
                 log.warning("yield on suspicious loop in thread: " + ti.getName() +
                         "\n\tat " + ci.getName() + "." + mi.getName() + "(" + file + ":" + line + ")");
@@ -224,10 +224,10 @@ public class IdleFilter extends PropertyListenerAdapter {
       // we assume this is not an idle loop and terminate the checks
       // <2do> this is too restrictive - we should leave this to state matching
       
-      if ((executedInsn instanceof JVMInvokeInstruction)
-          || (executedInsn instanceof ArrayStoreInstruction)) {
+      if ((insn instanceof InvokeInstruction)
+          || (insn instanceof ArrayStoreInstruction)) {
         int stackDepth = ti.getStackDepth();
-        int pc = executedInsn.getPosition();
+        int pc = insn.getPosition();
 
         if (stackDepth == ts.loopStackDepth) {
           if ((pc >= ts.loopStartPc) && (pc < ts.loopEndPc)) {
@@ -239,8 +239,8 @@ public class IdleFilter extends PropertyListenerAdapter {
   }
   
   // thread ids are reused, so we have to clean up
-  @Override
-  public void threadTerminated (VM vm, ThreadInfo ti){
+  public void threadTerminated (JVM jvm){
+    ThreadInfo ti = jvm.getLastThreadInfo();
     int tid = ti.getId();
     threadStats.set(tid, null);
   }

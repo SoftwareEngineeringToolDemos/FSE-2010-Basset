@@ -20,7 +20,7 @@ package gov.nasa.jpf.actor.util;
 
 import java.util.List;
 
-import gov.nasa.jpf.vm.MJIEnv;
+import gov.nasa.jpf.jvm.MJIEnv;
 
 /**
  * 

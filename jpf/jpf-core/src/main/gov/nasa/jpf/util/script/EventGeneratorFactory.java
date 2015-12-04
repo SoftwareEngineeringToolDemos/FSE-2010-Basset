@@ -1,29 +1,11 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
-
 package gov.nasa.jpf.util.script;
 
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.ListenerAdapter;
+import gov.nasa.jpf.jvm.ChoiceGenerator;
+import gov.nasa.jpf.jvm.SystemState;
 import gov.nasa.jpf.search.Search;
 import gov.nasa.jpf.util.DynamicObjectArray;
-import gov.nasa.jpf.vm.ChoiceGenerator;
-import gov.nasa.jpf.vm.SystemState;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -82,41 +64,33 @@ public abstract class EventGeneratorFactory extends ListenerAdapter
     }
 
     //--- those are all dummies - this isn't really a choice
-    @Override
-	public void advance() {}
+    public void advance() {}
 
-    @Override
-	public Class getChoiceType() {
+    public Class getChoiceType() {
       return null;
     }
 
-    @Override
-	public Object getNextChoice() {
+    public Object getNextChoice() {
       return null;
     }
 
-    @Override
-	public int getProcessedNumberOfChoices() {
+    public int getProcessedNumberOfChoices() {
       return 0;
     }
 
-    @Override
-	public int getTotalNumberOfChoices() {
+    public int getTotalNumberOfChoices() {
       return 0;
     }
 
-    @Override
-	public boolean hasMoreChoices() {
+    public boolean hasMoreChoices() {
       return false;
     }
 
-    @Override
-	public ChoiceGenerator randomize() {
+    public ChoiceGenerator randomize() {
       return null;
     }
 
-    @Override
-	public void reset() {}
+    public void reset() {}
 
   }
 
@@ -158,7 +132,6 @@ public abstract class EventGeneratorFactory extends ListenerAdapter
     script.process(this);
   }
 
-  @Override
   public Iterator<EventGenerator> iterator() {
     return queue.iterator();
   }
@@ -272,12 +245,10 @@ public abstract class EventGeneratorFactory extends ListenerAdapter
   /* we need this after a backtrack and restore to determine the next CG to return
    */
 
-  @Override
   public void searchStarted (Search search) {
     cur = 0;
   }
 
-  @Override
   public void stateAdvanced (Search search) {
     int idx = search.getStateId();
 
@@ -287,14 +258,12 @@ public abstract class EventGeneratorFactory extends ListenerAdapter
     }
   }
 
-  @Override
   public void stateBacktracked (Search search) {
     Memento m = states.get(search.getStateId());
     m.restore(this);
     // nextCg will be re-computed (->getNext), so there is no need to reset
   }
 
-  @Override
   public void stateRestored (Search search) {
     Memento m = states.get(search.getStateId());
     m.restore(this);

@@ -1,35 +1,36 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2010 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 
 package gov.nasa.jpf.test.mc.basic;
 
 import gov.nasa.jpf.ListenerAdapter;
-import gov.nasa.jpf.jvm.bytecode.JVMInvokeInstruction;
+import gov.nasa.jpf.jvm.ChoiceGenerator;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.MethodInfo;
+import gov.nasa.jpf.jvm.bytecode.Instruction;
+import gov.nasa.jpf.jvm.bytecode.InvokeInstruction;
 import gov.nasa.jpf.util.test.TestJPF;
-import gov.nasa.jpf.vm.ChoiceGenerator;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.MethodInfo;
 
 import org.junit.Test;
 
 /**
- * regression test for the CGRemover listener
+ * unit test for the CGRemover listener
  */
 public class CGRemoverTest extends TestJPF {
 
@@ -40,20 +41,19 @@ public class CGRemoverTest extends TestJPF {
       return data;
     }
 
-    @Override
-	public void run() {
-      int r = getData();  // <<<< should not cause CG, line 45
+    public void run() {
+      int r = getData();  // should not cause CG  !! LINE USED IN LOCATIONSPEC
     }
   }
 
   public static class R1Listener extends ListenerAdapter {
+    
+    public void choiceGeneratorSet (JVM vm){
+      ChoiceGenerator<?> cg = vm.getLastChoiceGenerator();
+      Instruction insn = cg.getInsn();
 
-    @Override
-    public void choiceGeneratorSet (VM vm, ChoiceGenerator<?> newCG){
-      Instruction insn = newCG.getInsn();
-
-      if (insn instanceof JVMInvokeInstruction){
-        MethodInfo mi = ((JVMInvokeInstruction)insn).getInvokedMethod();
+      if (insn instanceof InvokeInstruction){
+        MethodInfo mi = ((InvokeInstruction)insn).getInvokedMethod();
         if (mi.getName().equals("getData")){
           fail("CG should have been removed by CGRemover");
         }
@@ -66,13 +66,13 @@ public class CGRemoverTest extends TestJPF {
   public void testSyncLocation() {
     if (verifyNoPropertyViolation("+listener=.listener.CGRemover,.test.mc.basic.CGRemoverTest$R1Listener",
             "+log.info=gov.nasa.jpf.CGRemover",
-            "+cgrm.sync.cg_class=gov.nasa.jpf.vm.ThreadChoiceGenerator",
+            "+cgrm.sync.cg_class=gov.nasa.jpf.jvm.ThreadChoiceGenerator",
             "+cgrm.sync.locations=CGRemoverTest.java:45,CGRemoverTest.java:75")){
       R1 o = new R1();
       Thread t = new Thread(o);
       t.start();   // from now on 'o' is shared
 
-      int r = o.getData(); // <<< should not cause CG  , line 75
+      int r = o.getData(); // should not cause CG  !! LINE USED IN LocationSpec
     }
   }
 
@@ -81,7 +81,7 @@ public class CGRemoverTest extends TestJPF {
   public void testSyncCall() {
     if (verifyNoPropertyViolation("+listener=.listener.CGRemover,.test.mc.basic.CGRemoverTest$R1Listener",
             "+log.info=gov.nasa.jpf.CGRemover",
-            "+cgrm.sync.cg_class=gov.nasa.jpf.vm.ThreadChoiceGenerator",
+            "+cgrm.sync.cg_class=gov.nasa.jpf.jvm.ThreadChoiceGenerator",
             "+cgrm.sync.method_calls=gov.nasa.jpf.test.mc.basic.CGRemoverTest$R1.getData()")){
       R1 o = new R1();
       Thread t = new Thread(o);
@@ -95,7 +95,7 @@ public class CGRemoverTest extends TestJPF {
   public void testSyncBody() {
     if (verifyNoPropertyViolation("+listener=.listener.CGRemover,.test.mc.basic.CGRemoverTest$R1Listener",
             "+log.info=gov.nasa.jpf.CGRemover",
-            "+cgrm.sync.cg_class=gov.nasa.jpf.vm.ThreadChoiceGenerator",
+            "+cgrm.sync.cg_class=gov.nasa.jpf.jvm.ThreadChoiceGenerator",
             "+cgrm.sync.method_bodies=gov.nasa.jpf.test.mc.basic.CGRemoverTest$R1.run(),gov.nasa.jpf.test.mc.basic.CGRemoverTest.testSyncBody()")){
       R1 o = new R1();
       Thread t = new Thread(o);

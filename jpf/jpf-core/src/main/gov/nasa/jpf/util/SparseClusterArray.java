@@ -1,20 +1,21 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2008 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.util;
 
 import java.util.ConcurrentModificationException;
@@ -41,25 +42,25 @@ import java.util.NoSuchElementException;
  */
 public class SparseClusterArray <E> implements Iterable<E> {
 
-  public static final int CHUNK_BITS = 8;
-  public static final int CHUNK_SIZE = 256;
-  public static final int N_ELEM = 1 << CHUNK_BITS;     // 8 bits chunk index -> 24 bits segment key (3x8bits / 256 segs)
+  protected static final int CHUNK_BITS = 8;
+  protected static final int CHUNK_SIZE = 256;
+  protected static final int N_ELEM = 1 << CHUNK_BITS;     // 8 bits chunk index -> 24 bits segment key (3x8bits / 256 segs)
   protected static final int ELEM_MASK = 0xff;
   protected static final int BM_ENTRIES = N_ELEM / 64;     // number of bitmap long entries
   protected static final int MAX_BM_INDEX = BM_ENTRIES-1;
 
 
   // 8 bits per segment -> 256 children
-  public static final int SEG_BITS = 8;
-  public static final int N_SEG = 1 << SEG_BITS;
+  protected static final int SEG_BITS = 8;
+  protected static final int N_SEG = 1 << SEG_BITS;
   protected static final int SEG_MASK = 0xff;
-  public static final int S1 = 32-SEG_BITS; // L1 shift
-  public static final int S2 = S1-SEG_BITS; // L2 shift
-  public static final int S3 = S2-SEG_BITS; // L3 shift
+  protected static final int S1 = 32-SEG_BITS; // L1 shift
+  protected static final int S2 = S1-SEG_BITS; // L2 shift
+  protected static final int S3 = S2-SEG_BITS; // L3 shift
   protected static final int CHUNK_BASEMASK = ~SEG_MASK;
 
-  public static final int MAX_CLUSTERS = CHUNK_SIZE;      // max int with CHUNK_BITS bits (8)
-  public static final int MAX_CLUSTER_ENTRIES = 0xffffff; // max int with 32-CHUNK_BITS bits (24) = 16,777,215 elements
+  protected static final int MAX_CLUSTERS = CHUNK_SIZE;      // max int with CHUNK_BITS bits (8)
+  protected static final int MAX_CLUSTER_ENTRIES = 0xffffff; // max int with 32-CHUNK_BITS bits (24) = 16,777,215 elements
 
   protected Root root;
   protected Chunk lastChunk;
@@ -141,8 +142,7 @@ public class SparseClusterArray <E> implements Iterable<E> {
       bitmap = new long[BM_ENTRIES];
     }
 
-    @Override
-	public String toString() {
+    public String toString() {
       return "Chunk [base=" + base + ",top=" + top + ']';
     }
 
@@ -236,13 +236,11 @@ public class SparseClusterArray <E> implements Iterable<E> {
       }
     }
 
-    @Override
-	public boolean hasNext() {
+    public boolean hasNext() {
       return (cur != null);
     }
 
-    @Override
-	@SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked")
     public T next() {
       Chunk c = cur;
       int i = idx;
@@ -280,13 +278,11 @@ public class SparseClusterArray <E> implements Iterable<E> {
       return (T)ret;
     }
 
-    @Override
-	public void remove() {
+    public void remove() {
       throw new UnsupportedOperationException();
     }
 
-    @Override
-	public Iterator<T> iterator() {
+    public Iterator<T> iterator() {
       return this;
     }
   }
@@ -338,8 +334,7 @@ public class SparseClusterArray <E> implements Iterable<E> {
     }
 
 
-    @Override
-	public int next () {
+    public int next () {
       Chunk c = cur;
       int i = idx;
 
@@ -669,7 +664,7 @@ public class SparseClusterArray <E> implements Iterable<E> {
     return snap;
   }
 
-  protected <T> void populateSnapshot (Snapshot<E,T> snap, Transformer<E,T> transformer){
+  protected void populateSnapshot (Snapshot snap, Transformer transformer){
     int n = nSet;
 
     Object[] values = snap.values;
@@ -680,7 +675,7 @@ public class SparseClusterArray <E> implements Iterable<E> {
       int base = c.base;
       int i=-1;
       while ((i=c.nextSetBit(i+1)) >= 0) {
-        Object val = transformer.transform((E)c.elements[i]);
+        Object val = transformer.transform(c.elements[i]);
         values[j] = val;
         indices[j] = base + i;
 
@@ -692,7 +687,7 @@ public class SparseClusterArray <E> implements Iterable<E> {
   }
 
   @SuppressWarnings("unchecked")
-  public <T> void restore (Snapshot<E,T> snap, Transformer<T,E> transformer) {
+  public <T> void restoreSnapshot (Snapshot<E,T> snap, Transformer<T,E> transformer) {
     // <2do> - there are more efficient ways to restore small changes,
     // but since snapshot elements are ordered it should be reasonably fast
     clear();
@@ -740,19 +735,14 @@ public class SparseClusterArray <E> implements Iterable<E> {
 
   public void revertChanges (Entry<E> changes) {
     for (Entry<E> e = changes; e != null; e = e.next) {
-      set(e.index, e.value);
+      set(e.index, (E)e.value);
     }
   }
 
-  @Override
   public String toString() {
     return "SparseClusterArray [nSet=" + nSet + ']';
   }
 
-  public int numberOfElements() {
-    return nSet;
-  }
-  
   public int numberOfChunks() {
     // that's only for debugging purposes, we should probably cache
     int n = 0;
@@ -772,7 +762,6 @@ public class SparseClusterArray <E> implements Iterable<E> {
     return new ElementIndexIterator(fromIndex);
   }
   
-  @Override
   public Iterator<E> iterator() {
     return new ElementIterator<E>();
   }

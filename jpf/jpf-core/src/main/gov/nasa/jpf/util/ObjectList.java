@@ -1,20 +1,21 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2010 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.util;
 
 import gov.nasa.jpf.JPFException;
@@ -76,7 +77,7 @@ public abstract class ObjectList {
   // there are no instances, this class is only a static API
   private ObjectList(){}
   
-  private static class Node implements Cloneable {
+  private static class Node {
     Object data;
     Node next;
 
@@ -85,8 +86,7 @@ public abstract class ObjectList {
       this.next = next;
     }
     
-    @Override
-	public boolean equals(Object o){
+    public boolean equals(Object o){
       if (o instanceof Node){        
         Node n = this;
         Node no = (Node)o;
@@ -100,43 +100,6 @@ public abstract class ObjectList {
         return false;
       }
     }
-    
-    @Override
-	protected Node clone(){
-      try {
-        return (Node)super.clone();
-      } catch (CloneNotSupportedException cnsx){
-        throw new RuntimeException("Node clone failed");
-      }
-    }
-    
-    // recursively clone up to the node with the specified data
-    public Node cloneWithReplacedData (Object oldData, Object newData){
-      Node newThis = clone();
-      
-      if (data.equals(oldData)){
-        newThis.data = newData;
-        
-      } else if (next != null) {
-        newThis.next = next.cloneWithReplacedData(oldData, newData);
-      }
-      
-      return newThis;
-    }
-    
-    public Node cloneWithRemovedData (Object oldData){
-      Node newThis = clone();
-      
-      if (next != null){
-        if (next.data.equals(oldData)){
-          newThis.next = next.next;
-        } else {
-          newThis.next = next.cloneWithRemovedData( oldData);
-        }
-      }
-      
-      return newThis;      
-    }
   }
 
   public static class Iterator implements java.util.Iterator<Object>, Iterable<Object> {
@@ -146,13 +109,11 @@ public abstract class ObjectList {
       cur = head;
     }
     
-    @Override
-	public boolean hasNext() {
+    public boolean hasNext() {
       return cur != null;      
     }
 
-    @Override
-	public Object next() {
+    public Object next() {
       if (cur != null){
         if (cur instanceof Node){
           Node n = (Node)cur;
@@ -169,14 +130,12 @@ public abstract class ObjectList {
       }
     }
 
-    @Override
-	public void remove() {
+    public void remove() {
       // we can't remove since that would have to change the head field in the client
       throw new UnsupportedOperationException();
     }
     
-    @Override
-	public java.util.Iterator<Object> iterator(){
+    public java.util.Iterator<Object> iterator(){
       return this;
     }
   }
@@ -213,13 +172,11 @@ public abstract class ObjectList {
       }
     }
     
-    @Override
-	public boolean hasNext() {
+    public boolean hasNext() {
       return cur != null;      
     }
 
-    @Override
-	public A next() {
+    public A next() {
       
       if (cur != null){
         if (cur instanceof Node){
@@ -247,14 +204,12 @@ public abstract class ObjectList {
       }
     }
 
-    @Override
-	public void remove() {
+    public void remove() {
       // we can't remove since that would have to change the head field in the client
       throw new UnsupportedOperationException();
     }
     
-    @Override
-	public java.util.Iterator<A> iterator(){
+    public java.util.Iterator<A> iterator(){
       return this;
     }
   }
@@ -350,18 +305,24 @@ public abstract class ObjectList {
   }
   
   public static Object replace (Object head, Object oldData, Object newData){
+    
     if (oldData == null){
       return head;
     }
     if (newData == null){
-      return remove(head, oldData); // no null data, remove oldData
+      return remove(head, oldData);
     }
     
     if (head instanceof Node){
-      // <2do> perhaps we should first check if it is there
-      return ((Node)head).cloneWithReplacedData(oldData, newData);
+      for (Node n = (Node)head; n != null; n = n.next){
+        if (oldData.equals(n.data)){
+          n.data = newData;
+        }
+      }
       
-    } else { // single object
+      return head;
+      
+    } else {
       if (oldData.equals(head)){
         return newData;
       } else {
@@ -370,32 +331,50 @@ public abstract class ObjectList {
     }
   }
   
-  public static Object remove (Object head, Object data){
-    if (head == null || data == null){
-      return head;  
-    }
-
-    if (head instanceof Node) {
-      Node nh = (Node) head;
+  public static Object remove(Object head, Object data){
+    if (head == null){
+      return null;
       
-      Node nhn = nh.next;
-      if (nhn != null && nhn.next == null) { // 2 node case - reduce if found
-        if (nh.data.equals(data)) {
-          return nhn.data;
-        } else if (nhn.data.equals(data)) {
+    } else if (data == null){
+      return head;
+      
+    } else {
+      if (head instanceof Node){
+        Node nh = (Node)head;
+        
+        if (data.equals(nh.data)){
+          nh = nh.next;
+          
+        } else {
+          Node n = nh;
+          while (true) {
+            Node nn = n.next;
+            if (nn != null){
+              if (nn.data == data){
+                n.next = nn.next;
+                break;
+              } else {
+                n = nn;
+              }
+              
+            } else { // end reached
+              break;
+            }
+          }
+        }
+        
+        if (nh.next == null){ // reduce list
           return nh.data;
-        } else { // not there
+        } else {
+          return nh;
+        }
+        
+      } else { // head not a node -> single value
+        if (data.equals(head)){
+          return null;
+        } else {
           return head;
         }
-      }
-      
-      return nh.cloneWithRemovedData(data);
-      
-    } else { // single object
-      if (head.equals(data)){
-        return null;
-      } else {
-        return head;
       }
     }
   }
@@ -631,7 +610,7 @@ public abstract class ObjectList {
       return new Node( cloneData(n.data), cloneNode(n.next));
     }
   }
-    
+  
   public static Object clone (Object head) throws CloneNotSupportedException {
     if (head instanceof Node){
       return cloneNode( (Node)head);

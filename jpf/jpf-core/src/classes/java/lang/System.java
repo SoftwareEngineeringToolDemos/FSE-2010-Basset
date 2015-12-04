@@ -1,20 +1,21 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2007 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package java.lang;
 
 import java.io.InputStream;
@@ -67,40 +68,32 @@ public class System {
 
   static JavaLangAccess createJavaLangAccess () {
     return new JavaLangAccess(){
-      @Override
-	public ConstantPool getConstantPool(Class<?> cls) {
+      public ConstantPool getConstantPool(Class cls) {
         throw new UnsupportedOperationException("JavaLangAccess.getConstantPool() not supported yet");
         //return cls.getConstantPool();
       }
-      @Override
-	public void setAnnotationType(Class<?> cls, AnnotationType type) {
+      public void setAnnotationType(Class cls, AnnotationType type) {
         throw new UnsupportedOperationException("JavaLangAccess.setAnnotationType() not supported yet");
         //cls.setAnnotationType(type);
       }
-      @Override
-	public AnnotationType getAnnotationType(Class<?> cls) {
+      public AnnotationType getAnnotationType(Class cls) {
         throw new UnsupportedOperationException("JavaLangAccess.getAnnotationType() not supported yet");
         //return cls.getAnnotationType();
       }
-      @Override
-	public <E extends Enum<E>> E[] getEnumConstantsShared(Class<E> cls) {
+      public <E extends Enum<E>> E[] getEnumConstantsShared(Class<E> cls) {
         return cls.getEnumConstantsShared();
       }
-      @Override
-	public void blockedOn(Thread t, Interruptible b) {
+      public void blockedOn(Thread t, Interruptible b) {
         throw new UnsupportedOperationException("JavaLangAccess.blockedOn() not supported yet");
         //t.blockedOn(b);
       }
-      @Override
-	public void registerShutdownHook(int slot, Runnable r) {
+      public void registerShutdownHook(int slot, Runnable r) {
         throw new UnsupportedOperationException("JavaLangAccess.registerShutdownHook() not supported yet");
       }
-      @Override
-	public int getStackTraceDepth(Throwable t) {
+      public int getStackTraceDepth(Throwable t) {
         return t.getStackTraceDepth();
       }
-      @Override
-	public StackTraceElement getStackTraceElement(Throwable t, int i) {
+      public StackTraceElement getStackTraceElement(Throwable t, int i) {
         StackTraceElement[] st = t.getStackTrace();
         return st[i];
       }
@@ -136,7 +129,7 @@ public class System {
   public static native void gc();
   public static native void runFinalization();
   public static native void runFinalizersOnExit(boolean cond);
-  static native Class<?> getCallerClass();
+  static native Class getCallerClass();
   public static native int identityHashCode (Object o);
 
 
@@ -146,7 +139,7 @@ public class System {
 
   //--- environment
   public static native String getenv (String key);
-  public static Map<String,String> getenv() {
+  public static Map getenv() {
     throw new UnsupportedOperationException("getenv() not yet supported");
   }
 

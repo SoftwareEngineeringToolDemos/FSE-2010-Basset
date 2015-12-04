@@ -21,7 +21,7 @@ package gov.nasa.jpf.actor.util;
 import java.io.PrintStream;
 
 import gov.nasa.jpf.actor.JPF_gov_nasa_jpf_actor_core_Util;
-import gov.nasa.jpf.vm.MJIEnv;
+import gov.nasa.jpf.jvm.MJIEnv;
 
 /**
  * Logging utility to be used by code at the native or JVM level.

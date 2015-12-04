@@ -1,43 +1,45 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2007 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package gov.nasa.jpf.listener;
 
 import gov.nasa.jpf.Config;
 import gov.nasa.jpf.JPF;
 import gov.nasa.jpf.ListenerAdapter;
-import gov.nasa.jpf.jvm.bytecode.JVMFieldInstruction;
-import gov.nasa.jpf.jvm.bytecode.JVMInvokeInstruction;
+import gov.nasa.jpf.jvm.BooleanChoiceGenerator;
+import gov.nasa.jpf.jvm.ChoiceGenerator;
+import gov.nasa.jpf.jvm.ClassInfo;
+import gov.nasa.jpf.jvm.DoubleChoiceGenerator;
+import gov.nasa.jpf.jvm.IntChoiceGenerator;
+import gov.nasa.jpf.jvm.JVM;
+import gov.nasa.jpf.jvm.MethodInfo;
+import gov.nasa.jpf.jvm.ThreadChoiceGenerator;
+import gov.nasa.jpf.jvm.bytecode.FieldInstruction;
+import gov.nasa.jpf.jvm.bytecode.Instruction;
+import gov.nasa.jpf.jvm.bytecode.InvokeInstruction;
 import gov.nasa.jpf.jvm.bytecode.MONITORENTER;
 import gov.nasa.jpf.jvm.bytecode.MONITOREXIT;
-import gov.nasa.jpf.jvm.bytecode.JVMReturnInstruction;
+import gov.nasa.jpf.jvm.bytecode.ReturnInstruction;
 import gov.nasa.jpf.report.ConsolePublisher;
+import gov.nasa.jpf.report.HTMLPublisher;
 import gov.nasa.jpf.report.Publisher;
 import gov.nasa.jpf.report.PublisherExtension;
 import gov.nasa.jpf.search.Search;
-import gov.nasa.jpf.vm.BooleanChoiceGenerator;
-import gov.nasa.jpf.vm.ChoiceGenerator;
-import gov.nasa.jpf.vm.ClassInfo;
-import gov.nasa.jpf.vm.DoubleChoiceGenerator;
-import gov.nasa.jpf.vm.Instruction;
-import gov.nasa.jpf.vm.IntChoiceGenerator;
-import gov.nasa.jpf.vm.VM;
-import gov.nasa.jpf.vm.MethodInfo;
-import gov.nasa.jpf.vm.ThreadChoiceGenerator;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -88,6 +90,7 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
     initGroupers(config);
 
     jpf.addPublisherExtension(ConsolePublisher.class, this);
+    jpf.addPublisherExtension(HTMLPublisher.class, this);
   }
 
   private void initGroupers(Config config) {
@@ -152,8 +155,8 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
     return (grouper);
   }
 
-  @Override
-  public void choiceGeneratorSet(VM vm, ChoiceGenerator<?> newCG) {
+  public void choiceGeneratorSet(JVM vm) {
+    ChoiceGenerator generator;
     int i;
 
     // NOTE: we get this from SystemState.nextSuccessor, i.e. when the CG
@@ -167,13 +170,13 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
     // machine has multiple processors, a better solution would be to have a 
     // background thread process the generators.
 
-    m_choiceCount += newCG.getTotalNumberOfChoices();
+    generator = vm.getLastChoiceGenerator();
+    m_choiceCount += generator.getTotalNumberOfChoices();
 
     for (i = m_groupers.size(); --i >= 0; )
-      m_groupers.get(i).add(newCG);
+      m_groupers.get(i).add(generator);
   }
 
-  @Override
   public void searchStarted(Search search) {
     int i;
     
@@ -184,7 +187,6 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
     m_terminateTime = m_maxTime + System.currentTimeMillis();
   }
 
-  @Override
   public void stateAdvanced(Search search) {
     if (shouldTerminate(search)) {
       search.terminate();
@@ -211,7 +213,6 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
     return (false);
   }
 
-  @Override
   public void publishFinished(Publisher publisher) {
     CGGrouper groupers[];
 
@@ -220,6 +221,8 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
 
     if (publisher instanceof ConsolePublisher) {
       new PublishConsole((ConsolePublisher) publisher, groupers, m_maxOutputLines).publish();
+    } else if (publisher instanceof HTMLPublisher) {
+      new PublishHtml((HTMLPublisher) publisher, groupers, m_maxOutputLines).publish();
     }
   }
 
@@ -247,8 +250,7 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
 
   private static class CGPackageAccessor implements CGAccessor {
 
-    @Override
-	public Object getValue(ChoiceGenerator generator) {
+    public Object getValue(ChoiceGenerator generator) {
       ClassInfo ci;
       MethodInfo mi;
       Instruction instruction;
@@ -274,8 +276,7 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
 
   private static class CGClassAccessor implements CGAccessor {
 
-    @Override
-	public Object getValue(ChoiceGenerator generator) {
+    public Object getValue(ChoiceGenerator generator) {
       ClassInfo ci;
       MethodInfo mi;
       Instruction instruction;
@@ -301,8 +302,7 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
 
   private static class CGMethodAccessor implements CGAccessor {
 
-    @Override
-	public Object getValue(ChoiceGenerator generator) {
+    public Object getValue(ChoiceGenerator generator) {
       MethodInfo mi;
       Instruction instruction;
 
@@ -322,8 +322,7 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
 
   private static class CGInstructionAccessor implements CGAccessor {
 
-    @Override
-	public Object getValue(ChoiceGenerator generator) {
+    public Object getValue(ChoiceGenerator generator) {
       return (generator.getInsn());
     }
   }
@@ -333,8 +332,7 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
     private static final String OBJECT_CLASS_NAME = Object.class.getName();
     private static final String THREAD_CLASS_NAME = Thread.class.getName();
 
-    @Override
-	public Object getValue(ChoiceGenerator generator) {
+    public Object getValue(ChoiceGenerator generator) {
       if (generator instanceof ThreadChoiceGenerator) {
         return (getType((ThreadChoiceGenerator) generator));
       }
@@ -366,16 +364,16 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
         return (null);
       }
 
-      if (instruction instanceof JVMFieldInstruction) {
+      if (instruction instanceof FieldInstruction) {
         return (CGType.FieldAccess);
       }
 
-      if (instruction instanceof JVMInvokeInstruction) {
-        return (getType((JVMInvokeInstruction) instruction));
+      if (instruction instanceof InvokeInstruction) {
+        return (getType((InvokeInstruction) instruction));
       }
 
-      if (instruction instanceof JVMReturnInstruction) {
-        return (getType(generator, (JVMReturnInstruction) instruction));
+      if (instruction instanceof ReturnInstruction) {
+        return (getType(generator, (ReturnInstruction) instruction));
       }
 
       if (instruction instanceof MONITORENTER) {
@@ -389,7 +387,7 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
       return (null);
     }
 
-    private static CGType getType(JVMInvokeInstruction instruction) {
+    private static CGType getType(InvokeInstruction instruction) {
       MethodInfo mi;
 
       if (is(instruction, OBJECT_CLASS_NAME, "wait")) {
@@ -428,7 +426,7 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
       return (null);
     }
 
-    private static boolean is(JVMInvokeInstruction instruction, String className, String methodName) {
+    private static boolean is(InvokeInstruction instruction, String className, String methodName) {
       MethodInfo mi;
       ClassInfo ci;
 
@@ -446,7 +444,7 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
       return (true);
     }
 
-    private static CGType getType(ThreadChoiceGenerator generator, JVMReturnInstruction instruction) {
+    private static CGType getType(ThreadChoiceGenerator generator, ReturnInstruction instruction) {
       MethodInfo mi;
 
       if (generator.getThreadInfo().getStackDepth() <= 1) // The main thread has 0 frames.  Other threads have 1 frame.
@@ -555,8 +553,7 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
 
       comparator = new Comparator<Object>() {
 
-        @Override
-		public int compare(Object value1, Object value2) {
+        public int compare(Object value1, Object value2) {
           TreeNode node1, node2;
 
           node1 = m_childNodes.get(value1);
@@ -600,8 +597,7 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
       }
     }
 
-    @Override
-	public String toString() {
+    public String toString() {
       StringBuilder result;
 
       result = new StringBuilder();
@@ -698,8 +694,7 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
       m_output = publisher.getOut();
     }
 
-    @Override
-	public void publish() {
+    public void publish() {
       int i;
 
       for (i = 0; i < m_groupers.length; i++) {
@@ -797,6 +792,219 @@ public class StateSpaceAnalyzer extends ListenerAdapter implements PublisherExte
       for (i = levelCount; i > 0; i--) {
         m_output.print("   ");
       }
+    }
+  }
+
+  private static class PublishHtml extends Publish {
+
+    PublishHtml(HTMLPublisher publisher, CGGrouper[] groupers, int maxOutputLines) {
+      super(publisher, groupers, maxOutputLines);
+      m_output = publisher.getOut("State Space");
+    }
+
+    public void publish() {
+      int i;
+
+      m_output.println("      <style type=\"text/css\">");
+      m_output.println("         table             { border-collapse: collapse; white-space: nowrap; border: 1px solid #000000; }");
+      m_output.println("         th                { padding: 5px 5px; border: 1px solid #000000; background-color: #0080FF; }");
+      m_output.println("         td                { padding: 0px 5px; border: none; }");
+      m_output.println("         tr.treeNodeOpened { font-weight: bold; background-color: #A0D0FF; }");
+      m_output.println("         tr.treeNodeClosed { font-weight: bold; background-color: #A0D0FF; }");
+      m_output.println("      </style>");
+
+      ((HTMLPublisher) m_publisher).writeTableTreeScript(m_output, 0);
+
+      m_output.println("      <div style=\"white-space: nowrap;\">");
+
+      for (i = 0; i < m_groupers.length; i++) {
+        publishSortedData(i, m_groupers[i]);
+      }
+
+      m_output.println("      </div>");
+
+      m_output.flush();
+      m_output.close();
+    }
+
+    private void publishSortedData(int treeID, CGGrouper grouper) {
+      HTMLPublisher publisher;
+      TreeNode node;
+      List<TreeNode> tour;
+      List<String> nodeIDs;
+      StringBuilder nodeID;
+      int i, lines, lastLevel;
+
+      lines = 0;
+      lastLevel = -1;
+      publisher = (HTMLPublisher) m_publisher;
+      nodeID = new StringBuilder(Integer.toString(treeID));
+      node = grouper.getTree();
+      tour = node.tour();
+      nodeIDs = new ArrayList<String>();
+
+      m_output.println("<hr/>");
+
+      m_output.print("         <h2>Grouped By: ");
+      m_output.print(HTMLPublisher.escape(grouper.getName()));
+      m_output.println("</h2>");
+
+      publisher.writeTableTreeBegin(m_output);
+
+      // Write header row
+      m_output.println("         <thead>");
+      m_output.println("            <tr>");
+
+      m_output.print("               <th>");
+      m_output.print("");
+      m_output.println("</th>");
+
+      m_output.println("               <th>Choices</th>");
+      m_output.println("               <th>Generators</th>");
+      m_output.println("               <th>File</th>");
+      m_output.println("               <th>Line</th>");
+      m_output.println("               <th>Instruction</th>");
+      m_output.println("               <th>Position</th>");
+      m_output.println("               <th>Code</th>");
+      m_output.println("               <th>Generator Class</th>");
+      m_output.println("            </tr>");
+      m_output.println("         </thead>");
+      m_output.println("         <tbody>");
+
+      for (i = 0; (i < tour.size()) && (lines < m_maxOutputLines); i++) {
+        node = tour.get(i);
+
+        updateNodeID(nodeID, node.getLevel(), lastLevel, i);
+        lastLevel = node.getLevel();
+
+        publisher.writeTableTreeNodeBegin(m_output, nodeID.toString());
+        publishTreeNode(node);
+
+        if (node.isLeaf()) {
+          publishDetails(node);
+          nodeIDs.add(nodeID.toString());
+          lines++;
+        }
+
+        publisher.writeTableTreeNodeEnd(m_output);
+      }
+
+      if (lines >= m_maxOutputLines) {
+        publisher.writeTableTreeNodeBegin(m_output, "...");
+
+        m_output.print("<td>...</td>");
+        m_output.print("<td></td>"); // Choices
+        m_output.print("<td></td>"); // Generators
+        m_output.print("<td></td>"); // File
+        m_output.print("<td></td>"); // Line
+        m_output.print("<td></td>"); // Instruction
+        m_output.print("<td></td>"); // Position
+        m_output.print("<td></td>"); // Code
+        m_output.print("<td></td>"); // Generator Class
+
+        publisher.writeTableTreeNodeEnd(m_output);
+      }
+
+      m_output.println("         </tbody>");
+      publisher.writeTableTreeEnd(m_output);
+
+      publisher.writeTableTreeOpenNodes(m_output, nodeIDs);
+    }
+
+    private static void updateNodeID(StringBuilder nodeID, int level, int lastLevel, int ID) {
+      int pos;
+
+      for (; lastLevel >= level; lastLevel--) {
+        pos = nodeID.lastIndexOf("-");
+        nodeID.setLength(pos);
+      }
+
+      nodeID.append('-');
+      nodeID.append(ID);
+    }
+
+    private void publishTreeNode(TreeNode node) {
+      Object value;
+
+      // Tree
+      m_output.print("<td>");
+
+      value = node.getValue();
+      if (value == null) {
+        m_output.print("<i>null</i>");
+      } else {
+        m_output.print(HTMLPublisher.escape(value.toString()));
+      }
+
+      m_output.print("</td>");
+
+      // Choices
+      m_output.print("<td align=\"right\">");
+      m_output.print(node.getChoiceCount());
+      m_output.print("</td>");
+
+      // Generators
+      m_output.print("<td align=\"right\">");
+      m_output.print(node.getGeneratorCount());
+      m_output.print("</td>");
+
+      if (!node.isLeaf()) {
+        m_output.print("<td></td>"); // File
+        m_output.print("<td></td>"); // Line
+        m_output.print("<td></td>"); // Instruction
+        m_output.print("<td></td>"); // Position
+        m_output.print("<td></td>"); // Code
+        m_output.print("<td></td>"); // Generator Class
+      }
+    }
+
+    private void publishDetails(TreeNode node) {
+      ChoiceGenerator generator;
+      ClassInfo ci;
+      MethodInfo mi;
+      Instruction instruction;
+      String fileName;
+      int lineNumber;
+
+      instruction = node.getSampleGeneratorInstruction();
+      mi = instruction.getMethodInfo();
+      ci = mi.getClassInfo();
+
+      // File
+      if (ci == null) {
+        fileName = "[synthetic]";
+      } else {
+        fileName = ci.getSourceFileName();
+      }
+
+      m_output.print("<td>");
+      m_output.print(HTMLPublisher.escape(fileName));
+      m_output.print("</td>");
+
+      // Line
+      m_output.print("<td align=\"right\">");
+      lineNumber = mi.getLineNumber(instruction);
+      m_output.print(lineNumber > 0 ? lineNumber : "");
+
+      // Instruction
+      m_output.print("<td>");
+      m_output.print(HTMLPublisher.escape(instruction.getMnemonic()));
+      m_output.print("</td>");
+
+      // Position
+      m_output.print("<td align=\"\">");
+      m_output.print(instruction.getPosition());
+      m_output.print("</td>");
+
+      // Code
+      m_output.print("<td>");
+      m_output.print(HTMLPublisher.escape(instruction.getSourceOrLocation().trim()));
+      m_output.print("</td>");
+
+      // Generator Class
+      m_output.print("<td>");
+      m_output.print(HTMLPublisher.escape(node.getSampleGeneratorClassName()));
+      m_output.print("</td>");
     }
   }
 }

@@ -1,5 +1,0 @@
-Testsuite: gov.nasa.jpf.util.SparseIntVectorTest
-Tests run: 2, Failures: 0, Errors: 0, Time elapsed: 0.014 sec
-
-Testcase: testSnapshot took 0.002 sec
-Testcase: testSetGet took 0 sec

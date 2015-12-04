@@ -1,25 +1,26 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2010 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 
 package gov.nasa.jpf.test.vm.threads;
 
+import gov.nasa.jpf.jvm.Verify;
 import gov.nasa.jpf.util.test.TestJPF;
-import gov.nasa.jpf.vm.Verify;
 
 import org.junit.Test;
 
@@ -37,8 +38,7 @@ public class JoinTest extends TestJPF {
   @Test public void testSimpleJoin(){
     if (verifyNoPropertyViolation(JPF_ARGS)) {
       Runnable r = new Runnable() {
-        @Override
-		public void run() {
+        public void run() {
           System.out.println("thread-0 run");
         }
       };
@@ -59,8 +59,7 @@ public class JoinTest extends TestJPF {
   @Test public void testNoRunnableSimpleJoin() {
     if (verifyNoPropertyViolation(JPF_ARGS)) {
       Thread t = new Thread() {
-        @Override
-		public synchronized void run() {
+        public synchronized void run() {
           System.out.println("thread-0 run");
         }
       };
@@ -80,8 +79,7 @@ public class JoinTest extends TestJPF {
   static class SomeThread extends Thread {
     Object o;
 
-    @Override
-	public void run() {
+    public void run() {
       synchronized (this){
         // this causes a transition break - write on a shared object while
         // we still hold the lock
@@ -112,8 +110,7 @@ public class JoinTest extends TestJPF {
   @Test public void testJoinHoldingLock(){
     if (verifyNoPropertyViolation(JPF_ARGS)) {
       Runnable r = new Runnable() {
-        @Override
-		public void run() {
+        public void run() {
           System.out.println("thread-0 run");
         }
       };
@@ -136,8 +133,7 @@ public class JoinTest extends TestJPF {
   @Test public void testNotAliveJoin(){
     if (verifyNoPropertyViolation(JPF_ARGS)) {
       Runnable r = new Runnable() {
-        @Override
-		public void run() {
+        public void run() {
           System.out.println("thread-0 run");
         }
       };
@@ -147,7 +143,7 @@ public class JoinTest extends TestJPF {
 
       // poor man's join
       while (t.isAlive()){
-        Thread.yield();
+        Thread.currentThread().yield();
       }
 
       try {
@@ -162,8 +158,7 @@ public class JoinTest extends TestJPF {
   @Test public void testPreJoinInterrupt() {
     if (verifyNoPropertyViolation(JPF_ARGS)) {
       Runnable r = new Runnable() {
-        @Override
-		public void run() {
+        public void run() {
           System.out.println("thread-0 run");
         }
       };
@@ -187,8 +182,7 @@ public class JoinTest extends TestJPF {
       final Thread mainThread = Thread.currentThread();
 
       Runnable r = new Runnable() {
-        @Override
-		public void run() {
+        public void run() {
           System.out.println("thread-0 interrupting main");
           mainThread.interrupt();
         }
@@ -221,14 +215,12 @@ public class JoinTest extends TestJPF {
     if (verifyNoPropertyViolation(JPF_ARGS)) {
       try {
         final Thread t1 = new Thread() {
-          @Override
-		public void run() {
+          public void run() {
             Thread.yield();
           }
         };
         Thread t2 = new Thread() {
-          @Override
-		public void run() {
+          public void run() {
             try {
               t1.join();
             } catch (InterruptedException e) {
@@ -266,8 +258,7 @@ public class JoinTest extends TestJPF {
     if (verifyNoPropertyViolation(JPF_ARGS)) {
       try {
         final Thread t = new Thread() {
-          @Override
-		public void run() {
+          public void run() {
             synchronized(this){
               System.out.println("thread-0 notifying");
               notifyAll(); // this should not get us out of the join()
@@ -294,8 +285,7 @@ public class JoinTest extends TestJPF {
     if (verifyDeadlock(JPF_ARGS)) {
       try {
         final Thread t = new Thread() {
-          @Override
-		public void run() {
+          public void run() {
             synchronized(this){
               System.out.println("thread-0 notifying");
               notifyAll();
@@ -353,20 +343,17 @@ public class JoinTest extends TestJPF {
     if (verifyNoPropertyViolation(JPF_ARGS)) {
       final Thread[] worker = new Thread[3];
       worker[0] = new Thread(new Runnable() {
-        @Override
-		public void run() {
+        public void run() {
           System.out.println("worker[0] finished");
         }
       });
       worker[1] = new Thread(new Runnable() {
-        @Override
-		public void run() {
+        public void run() {
           System.out.println("worker[1] finished");
         }
       });
       worker[2] = new Thread(new Runnable() {
-        @Override
-		public void run() {
+        public void run() {
           System.out.println("worker[2] finished");
         }
       });
@@ -408,14 +395,11 @@ public class JoinTest extends TestJPF {
       ThreadGroup workers = new ThreadGroup("workers");
 
       Thread t = new Thread( workers, new Runnable(){
-        @Override
-		public void run() {
+        public void run() {
           Thread t1 = new Thread( new Runnable(){
-            @Override
-			public void run() {
+            public void run() {
               Thread t11 = new Thread(new Runnable() {
-                @Override
-				public void run() {
+                public void run() {
                   System.out.println("t11 run");
                   Verify.incrementCounter(0);
                 }
@@ -428,8 +412,7 @@ public class JoinTest extends TestJPF {
           t1.start();
 
           Thread t2 = new Thread( new Runnable(){
-            @Override
-			public void run() {
+            public void run() {
               System.out.println("t2 run");
               Verify.incrementCounter(2);
             }
@@ -487,16 +470,14 @@ public class JoinTest extends TestJPF {
           public void setToInterrupt(Thread toInterrupt) {
             this.toInterrupt = toInterrupt;
           }
-          @Override
-		public void run() {
+          public void run() {
             toInterrupt.interrupt();
           }
         }
         final ChildThread child = new ChildThread();
 
         class WaitingToJoinThread extends Thread {
-          @Override
-		public void run() {
+          public void run() {
             try {
               child.setToInterrupt(this);
               child.start();
@@ -540,8 +521,7 @@ public class JoinTest extends TestJPF {
 
     if (verifyNoPropertyViolation(JPF_ARGS)) {
       Runnable r = new Runnable() {
-        @Override
-		public void run() {
+        public void run() {
           System.out.println("thread-0 run");
           Thread.yield();
         }
@@ -589,8 +569,7 @@ public class JoinTest extends TestJPF {
 
     if (verifyNoPropertyViolation(JPF_ARGS)) {
       Runnable r = new Runnable() {
-        @Override
-		public void run() {
+        public void run() {
           System.out.println("thread-0 run");
           Thread.yield();
         }
@@ -645,8 +624,7 @@ public class JoinTest extends TestJPF {
   @Test public void testNestedLocksJoin() {
     if (verifyNoPropertyViolation(JPF_ARGS)){
       Thread t1 = new Thread() {
-        @Override
-		public synchronized void run() {
+        public synchronized void run() {
           System.out.println("t1 notifying");
           notifyAll();
 
@@ -662,8 +640,7 @@ public class JoinTest extends TestJPF {
       };
 
       Thread t2 = new Thread() {
-        @Override
-		public synchronized void run() {
+        public synchronized void run() {
           System.out.println("t2 notifying");
           notifyAll();
 

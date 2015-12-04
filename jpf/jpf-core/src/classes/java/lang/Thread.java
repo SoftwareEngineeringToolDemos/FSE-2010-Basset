@@ -1,23 +1,23 @@
-/*
- * Copyright (C) 2014, United States Government, as represented by the
- * Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The Java Pathfinder core (jpf-core) platform is licensed under the
- * Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * 
- *        http://www.apache.org/licenses/LICENSE-2.0. 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- */
+//
+// Copyright (C) 2006 United States Government as represented by the
+// Administrator of the National Aeronautics and Space Administration
+// (NASA).  All Rights Reserved.
+//
+// This software is distributed under the NASA Open Source Agreement
+// (NOSA), version 1.3.  The NOSA has been approved by the Open Source
+// Initiative.  See the file NOSA-1.3-JPF at the top of the distribution
+// directory tree for the complete NOSA document.
+//
+// THE SUBJECT SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY OF ANY
+// KIND, EITHER EXPRESSED, IMPLIED, OR STATUTORY, INCLUDING, BUT NOT
+// LIMITED TO, ANY WARRANTY THAT THE SUBJECT SOFTWARE WILL CONFORM TO
+// SPECIFICATIONS, ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+// A PARTICULAR PURPOSE, OR FREEDOM FROM INFRINGEMENT, ANY WARRANTY THAT
+// THE SUBJECT SOFTWARE WILL BE ERROR FREE, OR ANY WARRANTY THAT
+// DOCUMENTATION, IF PROVIDED, WILL CONFORM TO THE SUBJECT SOFTWARE.
+//
 package java.lang;
 
-import gov.nasa.jpf.annotation.NeverBreak;
 import sun.nio.ch.Interruptible;
 
 /**
@@ -41,6 +41,13 @@ public class Thread implements Runnable {
 
   // don't rename this - it's used by ThreadGoup.uncaughtException()
   private static volatile UncaughtExceptionHandler defaultUncaughtExceptionHandler; // null by default
+
+  
+  // JPF internal identifier - according to the Java specs, thread ids can be reused.
+  // We keep ids until the thread object is recycled, i.e. there are never two live thread
+  // objects that have the same id (regardless of whether the threads are already terminated or not)
+  int id;
+  
   
   // initialized in init(), except of the main thread (which gets explicitly initialized by the VM)
   ThreadGroup group;
@@ -53,13 +60,15 @@ public class Thread implements Runnable {
   // only if the thread is not blocked. If it is, we only change the status.
   // this gets cleared by calling interrupted()
   boolean             interrupted;
-  
-  // those are only accessed from peers since thread obects are per se shared
-  @NeverBreak
-  ThreadLocal.Entry<?>[] threadLocals;
-  
+
+  // <2do> those two seem to be the only interfaces to the ThreadLocal
+  // implementation. Replace once we have our own
+  // ThreadLocal / InhertitableThreadLocal classes
+  ThreadLocal.ThreadLocalMap threadLocals;
+  ThreadLocal.ThreadLocalMap inheritableThreadLocals;
+
   // this is what we use for sun.misc.Unsafe.park()/unpark()
-  // this is accessed from the native peer, VM.createMainThread() and sun.misc.Unsafe
+  // this is accessed from the native peer, JVM.createMainThread() and sun.misc.Unsafe
   static class Permit {
     boolean blockPark = true; // this is used to remember unpark() calls before park() (they don't accumulate)
   }
@@ -142,42 +151,11 @@ public class Thread implements Runnable {
 
     // do our associated native init
     init0(this.group, target, this.name, stackSize);
-    
-    initThreadLocals(cur);
   }
+
 
   // this takes care of ThreadInfo initialization
   native void init0 (ThreadGroup group, Runnable target, String name, long stackSize);
-  
-  // this is here since InheritableThreadLocals would require childValue(parentVal) roundtrips.
-  // Unfortunately we can't defer this until the ThreadLocal is actually accessed since
-  // we have to capture the value at the point of child creation
-  // Note this executes in the parent thread
-  private void initThreadLocals (Thread parent){
-    ThreadLocal.Entry<?>[] tl = parent.threadLocals;
-    if (tl != null){
-      int len = tl.length;
-      ThreadLocal.Entry<?>[] inherited = null;
-      int j=0;
-      
-      for (int i=0; i<len; i++){
-        ThreadLocal.Entry<?> e = tl[i];
-        ThreadLocal.Entry<?> ec = e.getChildEntry();
-        if (ec != null){
-          if (inherited == null){
-            inherited = new ThreadLocal.Entry<?>[len];
-          }
-          inherited[j++] = ec;
-        }
-      }
-      
-      if (inherited != null){
-        ThreadLocal.Entry<?>[] a = new ThreadLocal.Entry<?>[j];
-        System.arraycopy(inherited,0,a,0,j);
-        threadLocals = a;
-      }
-    }
-  }
   
   public static int activeCount () {
     return 0;
@@ -212,7 +190,9 @@ public class Thread implements Runnable {
     return isDaemon;
   }
 
-  public native long getId();
+  public long getId(){
+    return id;
+  }
 
   public StackTraceElement[] getStackTrace() {
     return null; // not yet implemented
@@ -342,7 +322,6 @@ public class Thread implements Runnable {
 
     
 
-  @Override
   public void run () {
     if (target != null) {
       target.run();
@@ -364,7 +343,6 @@ public class Thread implements Runnable {
   public native void resume();
 
 
-  @Override
   public String toString () {
     return ("Thread[" + name + ',' + priority + ',' + (group == null ? "" : group.getName()) + ']');
   }
@@ -382,30 +360,21 @@ public class Thread implements Runnable {
   /**
    * automatically called by system upon thread termination to clean up
    * references.
-   * 
    * NOTE - we clean up atomically during ThreadInfo.finish(), to avoid any
-   * additional states. This is important since group per se is a shared object
-   * We only include this method here as a specification for ThreadInfo
+   * additional states
    */
   private void exit () {
-    if (group != null){
-      group.threadTerminated(this);
-      group = null;
-    }
-    
-    threadLocals = null;    
-    parkBlocker = null;
-    uncaughtExceptionHandler = null;
+    // apparently some older javac on Solaris chokes on this, but it's perfectly fine
+    //group.remove(this);
+    //group = null;
+
+    //threadLocals = null;
+    //inheritableThreadLocals = null;
+    //parkBlocker = null;
   }
 
   // some Java 6 mojo
   // <2do> not implemented yet
   native void blockedOn (Interruptible b);
 
-  
-  // we probably will remove these fields once we modeled java.util.concurrent.ThreadLocalRandom 
-  // to make it deterministic
-  long threadLocalRandomSeed;
-  int threadLocalRandomProbe;
-  int threadLocalRandomSecondarySeed;
 }

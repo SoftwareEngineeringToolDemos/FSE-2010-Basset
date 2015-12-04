@@ -84,7 +84,8 @@ public abstract class TestBassetJPF extends TestJPF {
     Assert.assertEquals(messageDeliveryCount,
         Statistics.statMessageDeliveryCount);
     Assert.assertEquals(actorCreateCount, Statistics.statActorCreateCount);
-    Assert.assertEquals(actorDestroyedCount, Statistics.statActorDestroyedCount);
+    Assert
+        .assertEquals(actorDestroyedCount, Statistics.statActorDestroyedCount);
     Assert.assertEquals(actorTerminatedCount,
         Statistics.statActorTerminatedCount);
     Assert.assertEquals(deadlockCount, Statistics.statDeadlocks);
