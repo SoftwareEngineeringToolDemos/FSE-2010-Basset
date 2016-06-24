@@ -13,8 +13,8 @@ This repository _is not_ the original repository for this tool. Here are some li
 In this repository, for Basset you will find:
 
 + :white_check_mark: [Source code](https://github.com/SoftwareEngineeringToolDemos/FSE-2010-Basset/tree/master/jpf/jpf-actor)
-- :white_check_mark: [The original tool (available)](https://github.com/SoftwareEngineeringToolDemos/FSE-2010-Basset/tree/master/jpf) 
-* :white_check_mark: [Virtual machine containing tool](https://drive.google.com/open?id=0B49VkAq-KMteSUczVEdPY1VrT0U)
+* :white_check_mark: [The original tool (available)](https://github.com/SoftwareEngineeringToolDemos/FSE-2010-Basset/tree/master/jpf) 
+* :white_check_mark: [Virtual machine containing tool](http://go.ncsu.edu/SE-tool-VMs)
 
 This repository was constructed by [Vrushti Shah](https://github.com/vrushti1991) and [Manish Singh](https://github.com/manish211) under the supervision of [Dr. Emerson Murphy-Hill](https://github.com/CaptainEmerson).
 
